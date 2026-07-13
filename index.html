@@ -98,6 +98,19 @@
     background:rgba(28,28,30,.85);padding:3px 8px;border-radius:6px;display:none;
   }
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;}
+  #locateBtn{
+    position:absolute;bottom:20px;left:16px;z-index:500;
+    background:#2196f3;color:#fff;border:none;border-radius:50px;
+    padding:13px 16px;font-weight:700;font-size:14px;box-shadow:0 3px 10px rgba(0,0,0,.4);
+    cursor:pointer;
+  }
+  #nearestInfo{
+    position:absolute;bottom:76px;left:16px;z-index:500;
+    background:rgba(28,28,30,.95);color:var(--cream);border:1px solid #2196f3;
+    border-radius:8px;padding:8px 12px;font-size:12.5px;max-width:220px;display:none;
+    cursor:pointer;
+  }
+  #nearestInfo b{color:var(--amber);}
 </style>
 </head>
 <body>
@@ -120,6 +133,8 @@
 
 <div id="map"></div>
 <button id="addBtn">➕ Add location</button>
+<button id="locateBtn">📍 My Location</button>
+<div id="nearestInfo"></div>
 
 <div id="addModal">
   <div id="addModalBox">
@@ -604,6 +619,64 @@ document.getElementById('searchInput').addEventListener('input', runSearch);
 document.getElementById('searchClear').addEventListener('click', () => {
   document.getElementById('searchInput').value = '';
   runSearch();
+});
+
+// "My Location" — find the user and the nearest Stewart's to them
+function milesBetween(lat1, lng1, lat2, lng2){
+  const toRad = d => d * Math.PI / 180;
+  const R = 3958.8; // Earth radius in miles
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+let userMarker = null;
+const locateBtn = document.getElementById('locateBtn');
+const nearestInfo = document.getElementById('nearestInfo');
+
+locateBtn.addEventListener('click', () => {
+  if(!navigator.geolocation){
+    nearestInfo.style.display = 'block';
+    nearestInfo.textContent = "Your browser doesn't support location.";
+    return;
+  }
+  locateBtn.textContent = '📍 Locating...';
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const { latitude, longitude } = pos.coords;
+    locateBtn.textContent = '📍 My Location';
+
+    if(userMarker) map.removeLayer(userMarker);
+    userMarker = L.marker([latitude, longitude], {
+      icon: L.divIcon({
+        className:'',
+        html:'<div style="background:#2196f3;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.6);"></div>',
+        iconSize:[16,16], iconAnchor:[8,8]
+      })
+    }).addTo(map);
+    userMarker.bindPopup('You are here').openPopup();
+
+    let nearest = null, nearestDist = Infinity;
+    seedLocations.forEach(loc => {
+      const d = milesBetween(latitude, longitude, loc.lat, loc.lng);
+      if(d < nearestDist){ nearestDist = d; nearest = loc; }
+    });
+
+    map.setView([latitude, longitude], 13);
+
+    if(nearest){
+      nearestInfo.style.display = 'block';
+      nearestInfo.innerHTML = `Nearest: <b>${nearest.n}</b><br>${nearestDist.toFixed(1)} mi away — tap to view`;
+      nearestInfo.onclick = () => {
+        map.setView([nearest.lat, nearest.lng], 15);
+        if(markers[nearest.id]) markers[nearest.id].openPopup();
+      };
+    }
+  }, (err) => {
+    locateBtn.textContent = '📍 My Location';
+    nearestInfo.style.display = 'block';
+    nearestInfo.textContent = 'Could not get your location — check location permissions for this site.';
+  }, { enableHighAccuracy: true, timeout: 10000 });
 });
 </script>
 </body>
