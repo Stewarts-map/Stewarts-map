@@ -57,14 +57,14 @@
     filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
   }
   .leaflet-popup-content-wrapper{background:#fffaf0;border-radius:10px;}
-  .popup-inner{min-width:230px;font-size:14px;}
-  .popup-inner h3{margin:0 0 5px;font-size:16.5px;color:#1c1c1e;}
-  .popup-inner .addr{color:#666;font-size:12.5px;margin-bottom:8px;}
+  .popup-inner{min-width:230px;font-size:14px;max-height:56vh;overflow-y:auto;}
+  .popup-inner h3{margin:0 0 3px;font-size:15.5px;color:#1c1c1e;}
+  .popup-inner .addr{color:#666;font-size:11.5px;margin-bottom:6px;}
   .directions-btn, .directions-btn:visited, .directions-btn:hover{
     display:inline-block;background:#0d47a1;color:#fff !important;text-decoration:none;
     font-size:13px;font-weight:800;padding:7px 12px;border-radius:6px;
   }
-  .popup-actions{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  .popup-actions{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;}
   .share-btn{
     background:#444;color:#fff;border:none;font-size:13px;font-weight:800;
     padding:7px 12px;border-radius:6px;cursor:pointer;
@@ -75,14 +75,14 @@
   }
   .report-section{margin-bottom:10px;padding:8px;background:#fdecea;border-radius:6px;}
   .report-section .tip-input-row{display:flex;gap:8px;margin-bottom:4px;}
-  .rating-row{margin:10px 0;}
+  .rating-row{margin:6px 0;}
   .rating-label{font-weight:600;font-size:13px;color:#333;display:block;margin-bottom:3px;}
-  .star-quip{font-size:12.5px;font-style:italic;color:#777;margin-top:3px;min-height:16px;}
+  .star-quip{font-size:11.5px;font-style:italic;color:#777;margin-top:2px;min-height:13px;}
   .stars{font-size:24px;letter-spacing:3px;cursor:pointer;}
   .stars span{cursor:pointer;color:#ddd;transition:color .1s;}
   .stars span.filled{color:var(--amber);}
   .save-note{font-size:12px;color:#2f6b3c;margin-top:5px;height:16px;}
-  .tips-section{margin-top:12px;padding-top:10px;border-top:1px solid #eee;}
+  .tips-section{margin-top:8px;padding-top:6px;border-top:1px solid #eee;}
   .tips-list{list-style:none;margin:6px 0 8px;padding:0;max-height:110px;overflow-y:auto;}
   .tips-list li{font-size:13px;color:#444;padding:4px 0;border-bottom:1px dashed #eee;}
   .tip-input-row{display:flex;gap:8px;}
@@ -465,6 +465,23 @@ document.getElementById('themeToggle').addEventListener('click', () => {
 const map = L.map('map', { zoomControl: false }).setView([42.75, -73.80], 12);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+// Safety net: recalculate map size whenever the viewport or layout might have changed
+window.addEventListener('resize', () => map.invalidateSize());
+window.addEventListener('orientationchange', () => setTimeout(() => map.invalidateSize(), 200));
+setTimeout(() => map.invalidateSize(), 300); // catch any late layout shifts right after load
+
+// Hide the floating buttons while a popup is open so they never overlap its content
+map.on('popupopen', () => {
+  document.getElementById('locateBtn').style.display = 'none';
+  document.getElementById('nearestInfo').style.display = 'none';
+  document.getElementById('missingBtn').style.display = 'none';
+  document.getElementById('missingPanel').classList.remove('show');
+});
+map.on('popupclose', () => {
+  document.getElementById('locateBtn').style.display = '';
+  document.getElementById('missingBtn').style.display = '';
+});
+
 // Single tile source (the one we know reliably works) — dark mode is done with a CSS
 // color-invert trick on the tile layer itself, rather than depending on a second external
 // tile server that may be blocked, rate-limited, or require an account.
@@ -574,7 +591,7 @@ const bathroomQuips = {
   5: "Michelin-star restroom. Bring a book."
 };
 function quipFor(type, val){
-  if(!val) return 'Tap a star to rate';
+  if(!val) return 'Tap to rate';
   return (type === 'store' ? storeQuips : bathroomQuips)[val] || '';
 }
 
@@ -701,6 +718,7 @@ async function loadWeeklyRecap(){
   }catch(e){
     // silently skip — recap is a nice-to-have, not critical
   }
+  map.invalidateSize(); // header height may have just changed
 }
 
 function popupHtml(loc, agg, myVote){
@@ -752,7 +770,12 @@ function addMarker(loc){
   ratingsCache[loc.id] = ratingsCache[loc.id] || emptyAgg();
   myVoteCache[loc.id] = myVoteCache[loc.id] || emptyVote();
   const marker = L.marker([loc.lat, loc.lng], {icon: makeIcon(loc.id)}).addTo(map);
-  marker.bindPopup(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]));
+  marker.bindPopup(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]), {
+    maxWidth: Math.min(280, window.innerWidth - 40),
+    maxHeight: window.innerHeight * 0.6,
+    autoPanPaddingTopLeft: [10, 130],
+    autoPanPaddingBottomRight: [10, 60]
+  });
   marker.on('popupopen', () => {
     attachStarHandlers(loc);
     attachTipHandlers(loc);
@@ -861,6 +884,7 @@ async function loadAllRatings(){
   }));
   updateAchievementBadge();
   renderStreakDisplay();
+  map.invalidateSize(); // header height just changed (badges filled in) — tell Leaflet to recalculate
 }
 
 // Achievements — purely local/cosmetic, counts locations YOU'VE personally rated
