@@ -18,8 +18,12 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
     getFirestore, doc, getDoc, setDoc, increment, arrayUnion,
-    collection, addDoc, query, where, getDocs
+    collection, addDoc, query, where, getDocs, deleteDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDMu-9NYeqvBD4Mbp2jctoAF89raE7p8UM",
@@ -33,9 +37,20 @@
 
   const fbApp = initializeApp(firebaseConfig);
   const db = getFirestore(fbApp);
+  const auth = getAuth(fbApp);
 
   // Expose just what the rest of the (non-module) page script needs
-  window.__fb = { db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs };
+  window.__fb = {
+    db, doc, getDoc, setDoc, increment, arrayUnion, collection, addDoc, query, where, getDocs, deleteDoc,
+    auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
+  };
+
+  // Track login state globally — the rest of the page (non-module script) reads window.__currentUser
+  window.__currentUser = null;
+  onAuthStateChanged(auth, (user) => {
+    window.__currentUser = user;
+    window.dispatchEvent(new Event('authStateReady'));
+  });
 </script>
 <style>
   :root{
@@ -140,15 +155,20 @@
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
     padding:5px 10px;border-radius:6px;cursor:pointer;
   }
+  #accountToggle{
+    position:absolute;top:112px;right:10px;z-index:500;font-size:12px;font-weight:700;
+    background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
+    padding:5px 10px;border-radius:6px;cursor:pointer;
+  }
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
   #locateBtn{
-    position:absolute;top:122px;right:10px;z-index:500;
+    position:absolute;top:156px;right:10px;z-index:500;
     background:#2196f3;color:#fff;border:none;border-radius:50px;
     padding:11px 14px;font-weight:700;font-size:13.5px;box-shadow:0 3px 10px rgba(0,0,0,.4);
     cursor:pointer;
   }
   #nearestInfo{
-    position:absolute;top:170px;right:10px;z-index:500;
+    position:absolute;top:204px;right:10px;z-index:500;
     background:var(--panel-bg);color:var(--cream);border:1px solid #2196f3;
     border-radius:8px;padding:8px 12px;font-size:13px;max-width:220px;display:none;
     cursor:pointer;line-height:1.4;
@@ -211,6 +231,12 @@
   }
   #leaderboardPanel.show{display:flex;}
   #leaderboardClose{background:none;border:none;color:var(--cream);font-size:22px;cursor:pointer;}
+  #accountPanel{
+    position:absolute;inset:0;z-index:1500;background:var(--charcoal);display:none;
+    flex-direction:column;
+  }
+  #accountPanel.show{display:flex;}
+  #accountClose{background:none;border:none;color:var(--cream);font-size:22px;cursor:pointer;}
   .leaderboard-row{
     padding:10px 16px;border-bottom:1px solid #333;color:var(--cream);
     display:flex;justify-content:space-between;align-items:center;
@@ -275,6 +301,7 @@
 <button id="openNowToggle">🕐 Open now</button>
 <button id="listViewToggle">📋 List</button>
 <button id="leaderboardToggle">🏆 Leaderboard</button>
+<button id="accountToggle">👤 Account</button>
 
 <div id="map"></div>
 <button id="locateBtn">📍 Where am I?</button>
@@ -300,6 +327,7 @@
       <li>🔗 <b>Share</b> a pin, or 🚩 <b>Report</b> a problem (wrong info, permanently closed, etc.) — right in each pin's popup.</li>
       <li>📋 Use <b>List</b> to browse every location, or <b>Where am I?</b> to find the closest one.</li>
       <li>🏆 Claim a name on the <b>Leaderboard</b> to see how many spots you've rated compared to others.</li>
+      <li>👤 <b>Log in</b> (just a username & password, no email) to make your name and ratings follow you across devices instead of staying stuck to one phone. <b>No password recovery exists</b> — if you forget it, that username is gone for good.</li>
     </ul>
     <p style="font-size:11.5px;color:#888;border-top:1px solid #ddd;padding-top:10px;margin-bottom:6px;">
       Unofficial fan project — not affiliated with or endorsed by Stewart's Shops. Store hours shown may vary or be out of date — always call ahead if it matters.
@@ -323,6 +351,12 @@
     <span>🏆 Leaderboard</span>
     <button id="leaderboardClose">✕</button>
   </div>
+  <p style="padding:10px 16px 0;color:var(--muted);font-size:12px;font-style:italic;margin:0;">
+    Completely optional, purely for fun, and entirely unnecessary — genuinely nobody needs to be
+    the leading authority on convenience store bathrooms. If you're near the top of this list,
+    maybe take a second to reflect on some of your recent life choices. We're not judging. We're
+    right here with you.
+  </p>
   <div style="padding:14px 16px;border-bottom:1px solid #333;">
     <div class="rating-label" style="color:var(--cream);margin-bottom:6px;">Your leaderboard name</div>
     <div class="tip-input-row">
@@ -332,6 +366,37 @@
     <div class="save-note" id="displayNameNote" style="height:auto;"></div>
   </div>
   <div id="leaderboardItems" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
+</div>
+
+<div id="accountPanel">
+  <div id="listViewHeader">
+    <span>👤 Account</span>
+    <button id="accountClose">✕</button>
+  </div>
+  <div style="padding:16px;">
+    <div id="loggedOutView">
+      <p style="color:var(--cream);font-size:13px;margin:0 0 12px;">
+        Log in to make your name and rating history follow you across devices — otherwise
+        everything's tied just to this phone/browser.
+      </p>
+      <div class="rating-label" style="color:var(--cream);">Username</div>
+      <input type="text" id="authUsername" maxlength="20" placeholder="letters, numbers, underscore" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+      <div class="rating-label" style="color:var(--cream);">Password</div>
+      <input type="password" id="authPassword" placeholder="at least 6 characters" style="width:100%;margin-bottom:8px;background:#fff;color:#1c1c1e;font-size:16px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;" />
+      <p style="background:#3a2226;border:1px solid #e53935;border-radius:6px;padding:8px 10px;color:#ffab91;font-size:12px;margin:0 0 12px;">
+        ⚠️ There's no email attached to this account, so there's no way to reset a forgotten password — not by you, not by us. Once it's set, write it down somewhere safe. If it's lost, that username is gone for good.
+      </p>
+      <button class="btn btn-amber" id="authSignUpBtn" style="width:100%;margin-bottom:8px;">Sign Up (new account)</button>
+      <button class="btn btn-secondary" id="authLogInBtn" style="width:100%;">Log In (existing account)</button>
+      <div class="save-note" id="authNote" style="height:auto;margin-top:8px;"></div>
+    </div>
+    <div id="loggedInView" style="display:none;">
+      <p style="color:var(--cream);font-size:15px;margin:0 0 12px;">
+        Logged in as <b id="loggedInUsername" style="color:var(--amber);"></b>
+      </p>
+      <button class="btn btn-danger" id="logOutBtn" style="width:100%;">Log Out</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -741,6 +806,7 @@ map.on('popupopen', () => {
   document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
   document.getElementById('leaderboardToggle').style.display = 'none';
+  document.getElementById('accountToggle').style.display = 'none';
 });
 map.on('popupclose', () => {
   document.getElementById('locateBtn').style.display = '';
@@ -748,6 +814,7 @@ map.on('popupclose', () => {
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
   document.getElementById('leaderboardToggle').style.display = '';
+  document.getElementById('accountToggle').style.display = '';
   const wasCollapsed = localStorage.getItem('legendCollapsed') === '1';
   if(!wasCollapsed) document.getElementById('legendBody').classList.remove('collapsed');
 
@@ -922,12 +989,102 @@ function getClientId(){
   return id;
 }
 
-// Leaderboard display names — no login, just an anonymous device ID claiming a name.
-// Uniqueness is enforced by checking whether any OTHER device already claimed it.
+// The "effective" identity used everywhere data gets saved: your logged-in account if you're
+// logged in, otherwise the same anonymous per-device ID as before. This is what lets logging
+// in make your ratings/name follow you across devices instead of being stuck to one phone.
+function getEffectiveId(){
+  return (window.__currentUser && window.__currentUser.uid) || getClientId();
+}
+function isLoggedIn(){
+  return !!(window.__currentUser && window.__currentUser.uid);
+}
+
+// Turns a plain username into the fake email Firebase's login system needs internally —
+// nobody ever sees this, it's just how we get "username + password" out of a system built
+// around email addresses.
+function usernameToEmail(username){
+  const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  return clean + '@stewarts-map.local';
+}
+
+async function signUpAccount(username, password){
+  const clean = username.trim();
+  if(clean.length < 3) return { ok: false, reason: 'Username needs to be at least 3 characters.' };
+  if(!/^[a-zA-Z0-9_]+$/.test(clean)) return { ok: false, reason: 'Letters, numbers, and underscores only.' };
+  if(password.length < 6) return { ok: false, reason: 'Password needs to be at least 6 characters.' };
+  try{
+    const {auth, createUserWithEmailAndPassword} = await fb();
+    const oldAnonId = getClientId(); // capture before login changes what getEffectiveId() returns
+    const cred = await createUserWithEmailAndPassword(auth, usernameToEmail(clean), password);
+    await migrateAnonymousDataToAccount(oldAnonId, cred.user.uid, clean);
+    return { ok: true };
+  }catch(e){
+    if(e.code === 'auth/email-already-in-use') return { ok: false, reason: 'That username is already taken.' };
+    console.error('signUpAccount failed', e);
+    return { ok: false, reason: 'Something went wrong — try again.' };
+  }
+}
+
+async function logInAccount(username, password){
+  const clean = username.trim();
+  try{
+    const {auth, signInWithEmailAndPassword} = await fb();
+    const oldAnonId = getClientId();
+    const cred = await signInWithEmailAndPassword(auth, usernameToEmail(clean), password);
+    await migrateAnonymousDataToAccount(oldAnonId, cred.user.uid, clean);
+    return { ok: true };
+  }catch(e){
+    if(e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password'){
+      return { ok: false, reason: 'Wrong username or password.' };
+    }
+    console.error('logInAccount failed', e);
+    return { ok: false, reason: 'Something went wrong — try again.' };
+  }
+}
+
+async function logOutAccount(){
+  const {auth, signOut} = await fb();
+  await signOut(auth);
+}
+
+// One-time migration: folds this device's existing anonymous ratings/name into the new
+// account, so signing up doesn't wipe out history you already built up on this device.
+async function migrateAnonymousDataToAccount(oldAnonId, newUid, username){
+  if(oldAnonId === newUid) return; // nothing to migrate (shouldn't normally happen)
+  try{
+    const {db, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs} = await fb();
+
+    // Move each vote this device made over to the new account
+    const votesQuery = query(collection(db, 'votes'), where('clientId', '==', oldAnonId));
+    const votesSnap = await getDocs(votesQuery);
+    for(const voteDoc of votesSnap.docs){
+      const data = voteDoc.data();
+      const locId = data.locId;
+      if(!locId) continue;
+      await setDoc(doc(db, 'votes', locId + '_' + newUid), { ...data, clientId: newUid }, { merge: true });
+      await deleteDoc(voteDoc.ref);
+    }
+
+    // Carry over a previously-set leaderboard name, if the new account doesn't already have one
+    const newNameSnap = await getDoc(doc(db, 'displayNames', newUid));
+    if(!newNameSnap.exists()){
+      const oldNameSnap = await getDoc(doc(db, 'displayNames', oldAnonId));
+      if(oldNameSnap.exists()){
+        await setDoc(doc(db, 'displayNames', newUid), oldNameSnap.data());
+        await deleteDoc(doc(db, 'displayNames', oldAnonId));
+      }
+    }
+  }catch(e){
+    console.error('migrateAnonymousDataToAccount failed (non-fatal):', e);
+  }
+}
+
+// Leaderboard display names — tied to your account if logged in, otherwise your device.
+// Uniqueness is enforced by checking whether any OTHER identity already claimed it.
 async function loadMyDisplayName(){
   try{
     const {db, doc, getDoc} = await fb();
-    const snap = await getDoc(doc(db, 'displayNames', getClientId()));
+    const snap = await getDoc(doc(db, 'displayNames', getEffectiveId()));
     return snap.exists() ? snap.data().name : null;
   }catch(e){
     return null;
@@ -951,7 +1108,7 @@ async function claimDisplayName(name){
   const normalized = trimmed.toLowerCase();
   try{
     const {db, doc, getDoc, setDoc, collection, query, where, getDocs} = await fb();
-    const myId = getClientId();
+    const myId = getEffectiveId();
 
     // Check if anyone ELSE already has this name
     const q = query(collection(db, 'displayNames'), where('nameLower', '==', normalized));
@@ -1011,13 +1168,21 @@ let deviceIsBlocked = false;
 async function checkIfBlocked(){
   try{
     const {db, doc, getDoc} = await fb();
-    const snap = await getDoc(doc(db, 'blockedDevices', getClientId()));
+    const snap = await getDoc(doc(db, 'blockedDevices', getEffectiveId()));
     deviceIsBlocked = snap.exists();
   }catch(e){
     deviceIsBlocked = false; // fail open — don't block anyone due to a network hiccup
   }
 }
 checkIfBlocked();
+// Firebase Auth resolves whether you're logged in asynchronously — if it turns out you WERE
+// logged in (session remembered from before), re-check/reload anything identity-dependent
+// that may have already run against the wrong (anonymous) fallback ID.
+window.addEventListener('authStateReady', () => {
+  checkIfBlocked();
+  if(typeof loadAllRatings === 'function') loadAllRatings();
+  if(typeof updateAccountUI === 'function') updateAccountUI();
+});
 
 // Shared (public) aggregate — visible to everyone who opens this map
 async function loadAggregate(id){
@@ -1048,11 +1213,11 @@ async function bumpAggregate(id, sumKey, sumDelta, countKey, countDelta){
   }
 }
 
-// Personal (per-device) record of your own vote, so you can edit it later
+// Personal record of your own vote (per-account if logged in, per-device otherwise)
 async function loadMyVote(id){
   try{
     const {db, doc, getDoc} = await fb();
-    const snap = await getDoc(doc(db, 'votes', id + '_' + getClientId()));
+    const snap = await getDoc(doc(db, 'votes', id + '_' + getEffectiveId()));
     if(!snap.exists()) return emptyVote();
     return { ...emptyVote(), ...snap.data() };
   }catch(e){
@@ -1062,7 +1227,7 @@ async function loadMyVote(id){
 async function saveMyVote(id, data){
   try{
     const {db, doc, setDoc} = await fb();
-    const clientId = getClientId();
+    const clientId = getEffectiveId();
     await setDoc(doc(db, 'votes', id + '_' + clientId), {
       ...data,
       clientId,
@@ -1784,6 +1949,87 @@ document.getElementById('leaderboardClose').addEventListener('click', () => {
   suppressNextLocateClick = true;
   setTimeout(() => { suppressNextLocateClick = false; }, 400);
 });
+
+// Account panel
+function updateAccountUI(){
+  const loggedIn = isLoggedIn();
+  document.getElementById('loggedOutView').style.display = loggedIn ? 'none' : 'block';
+  document.getElementById('loggedInView').style.display = loggedIn ? 'block' : 'none';
+  const accountBtn = document.getElementById('accountToggle');
+  if(loggedIn){
+    const email = window.__currentUser.email || '';
+    const username = email.split('@')[0];
+    document.getElementById('loggedInUsername').textContent = username;
+    accountBtn.textContent = '👤 ' + username;
+  } else {
+    accountBtn.textContent = '👤 Account';
+  }
+}
+
+document.getElementById('accountToggle').addEventListener('click', () => {
+  updateAccountUI();
+  document.getElementById('accountPanel').classList.add('show');
+});
+document.getElementById('accountClose').addEventListener('click', () => {
+  document.getElementById('accountPanel').classList.remove('show');
+  suppressNextLocateClick = true;
+  setTimeout(() => { suppressNextLocateClick = false; }, 400);
+});
+
+document.getElementById('authSignUpBtn').addEventListener('click', async () => {
+  const username = document.getElementById('authUsername').value;
+  const password = document.getElementById('authPassword').value;
+  const note = document.getElementById('authNote');
+  const btn = document.getElementById('authSignUpBtn');
+  btn.disabled = true;
+  note.style.color = '#999';
+  note.textContent = 'Creating your account...';
+  const result = await signUpAccount(username, password);
+  if(result.ok){
+    note.style.color = '#4caf50';
+    note.textContent = 'Account created! You\'re logged in.';
+    updateAccountUI();
+    updateAchievementBadge();
+    loadAllRatings();
+  } else {
+    note.style.color = '#e57373';
+    note.textContent = result.reason;
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('authLogInBtn').addEventListener('click', async () => {
+  const username = document.getElementById('authUsername').value;
+  const password = document.getElementById('authPassword').value;
+  const note = document.getElementById('authNote');
+  const btn = document.getElementById('authLogInBtn');
+  btn.disabled = true;
+  note.style.color = '#999';
+  note.textContent = 'Logging in...';
+  const result = await logInAccount(username, password);
+  if(result.ok){
+    note.style.color = '#4caf50';
+    note.textContent = 'Logged in!';
+    updateAccountUI();
+    updateAchievementBadge();
+    loadAllRatings();
+  } else {
+    note.style.color = '#e57373';
+    note.textContent = result.reason;
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('logOutBtn').addEventListener('click', async () => {
+  await logOutAccount();
+  updateAccountUI();
+  updateAchievementBadge();
+  loadAllRatings();
+  document.getElementById('authNote').textContent = '';
+  document.getElementById('authUsername').value = '';
+  document.getElementById('authPassword').value = '';
+});
+
 document.getElementById('displayNameSave').addEventListener('click', async () => {
   const input = document.getElementById('displayNameInput');
   const note = document.getElementById('displayNameNote');
