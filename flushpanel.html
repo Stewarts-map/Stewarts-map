@@ -38,6 +38,8 @@
   .stat-row{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
   .stat-box{background:#262626;border-radius:8px;padding:10px 14px;font-size:13px;}
   .stat-box b{display:block;font-size:20px;color:#f5a623;}
+  #namesSection.collapsed{display:none;}
+  #locationsSection.collapsed{display:none;}
 </style>
 </head>
 <body>
@@ -72,17 +74,42 @@
   </tbody>
 </table>
 
-<h2 style="font-size:16px;margin:20px 0 8px;">All Locations</h2>
-<input type="text" id="filterBox" placeholder="Filter by name, address, or store #..." />
+<h2 id="locationsToggle" style="font-size:16px;margin:20px 0 8px;cursor:pointer;user-select:none;">All Locations <span id="locationsArrow">▾</span></h2>
+<div id="locationsSection">
+  <input type="text" id="filterBox" placeholder="Filter by name, address, or store #..." />
 
-<table>
-  <thead>
-    <tr><th>Location</th><th id="th-store" style="cursor:pointer;">Store ⇅</th><th id="th-bathroom" style="cursor:pointer;">Bathroom ⇅</th><th id="th-reviews" style="cursor:pointer;">Reviews ⇅</th><th>Tips</th><th>Actions</th></tr>
-  </thead>
-  <tbody id="tableBody">
-    <tr><td colspan="6" class="loading">Loading data from Firestore…</td></tr>
-  </tbody>
-</table>
+  <table>
+    <thead>
+      <tr><th>Location</th><th id="th-store" style="cursor:pointer;">Store ⇅</th><th id="th-bathroom" style="cursor:pointer;">Bathroom ⇅</th><th id="th-reviews" style="cursor:pointer;">Reviews ⇅</th><th>Tips</th><th>Actions</th></tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="6" class="loading">Loading data from Firestore…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2 id="namesToggle" style="font-size:16px;margin:20px 0 8px;cursor:pointer;user-select:none;">🏆 Leaderboard Names <span id="namesArrow">▾</span></h2>
+<div id="namesSection">
+  <p style="color:#999;font-size:12px;margin:0 0 8px;">If someone's device ID resets (cleared browser data, new phone, etc.) and their old name is stuck unavailable, release it here so they can reclaim it.</p>
+  <table style="margin-bottom:24px;">
+    <thead>
+      <tr><th>Name</th><th>Claimed</th><th>Action</th></tr>
+    </thead>
+    <tbody id="namesBody">
+      <tr><td colspan="3" class="loading">Loading…</td></tr>
+    </tbody>
+  </table>
+
+  <div style="font-weight:700;color:#f5a623;margin-bottom:8px;">🚩 Reported Names</div>
+  <table style="margin-bottom:12px;">
+    <thead>
+      <tr><th>Name</th><th>Reported</th><th>Action</th></tr>
+    </thead>
+    <tbody id="nameReportsBody">
+      <tr><td colspan="3" class="loading">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
 
 <script>
 const seedLocations = [
@@ -401,6 +428,28 @@ async function dismissReport(reportId){
   }
 }
 
+async function releaseName(clientId){
+  try{
+    const {db, doc, deleteDoc} = await fb();
+    await deleteDoc(doc(db, 'displayNames', clientId));
+    return true;
+  }catch(e){
+    console.error('releaseName failed', e);
+    return false;
+  }
+}
+
+async function dismissNameReport(reportId){
+  try{
+    const {db, doc, deleteDoc} = await fb();
+    await deleteDoc(doc(db, 'nameReports', reportId));
+    return true;
+  }catch(e){
+    console.error('dismissNameReport failed', e);
+    return false;
+  }
+}
+
 async function dismissMissing(missingId){
   try{
     const {db, doc, deleteDoc} = await fb();
@@ -484,6 +533,55 @@ async function loadAll(){
   document.getElementById('statLocations').textContent = seedLocations.length;
   document.getElementById('statRated').textContent = ratedCount;
   document.getElementById('statTips').textContent = totalTips;
+
+  try{
+    const namesSnap = await getDocs(collection(db, 'displayNames'));
+    const names = [];
+    namesSnap.forEach(d => names.push({ clientId: d.id, ...d.data() }));
+    names.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const namesBody = document.getElementById('namesBody');
+    if(names.length === 0){
+      namesBody.innerHTML = '<tr><td colspan="3" class="loading">No names claimed yet.</td></tr>';
+    } else {
+      namesBody.innerHTML = names.map(n => {
+        const when = n.updatedAt ? new Date(n.updatedAt).toLocaleString() : '—';
+        return `<tr>
+          <td><b>${escapeHtml(n.name || '')}</b></td>
+          <td style="color:#999;">${when}</td>
+          <td><button class="release-name-btn" data-clientid="${n.clientId}" data-name="${escapeHtml(n.name||'')}" style="background:#b71c1c;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">🗑️ Release</button></td>
+        </tr>`;
+      }).join('');
+    }
+  }catch(e){
+    console.error('Failed to load displayNames', e);
+    document.getElementById('namesBody').innerHTML = '<tr><td colspan="3" class="loading">Could not load — check Firestore rules for the displayNames collection.</td></tr>';
+  }
+
+  try{
+    const nameReportsSnap = await getDocs(collection(db, 'nameReports'));
+    const nameReports = [];
+    nameReportsSnap.forEach(d => nameReports.push({ id: d.id, ...d.data() }));
+    nameReports.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const nameReportsBody = document.getElementById('nameReportsBody');
+    if(nameReports.length === 0){
+      nameReportsBody.innerHTML = '<tr><td colspan="3" class="loading">No reported names.</td></tr>';
+    } else {
+      nameReportsBody.innerHTML = nameReports.map(r => {
+        const when = r.ts ? new Date(r.ts).toLocaleString() : '—';
+        return `<tr>
+          <td><b>${escapeHtml(r.name || '')}</b></td>
+          <td style="color:#999;">${when}</td>
+          <td>
+            <button class="release-reported-name-btn" data-clientid="${r.clientId}" data-reportid="${r.id}" style="background:#b71c1c;color:#fff;border:none;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;margin-right:4px;">Release name</button>
+            <button class="dismiss-name-report-btn" data-reportid="${r.id}" style="background:#444;color:#fff;border:none;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;">Dismiss</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+  }catch(e){
+    console.error('Failed to load nameReports', e);
+    document.getElementById('nameReportsBody').innerHTML = '<tr><td colspan="3" class="loading">Could not load — check Firestore rules for the nameReports collection.</td></tr>';
+  }
 
   const reportsSnap = await getDocs(collection(db, 'reports'));
   const reports = [];
@@ -721,6 +819,61 @@ document.getElementById('reportsBody').addEventListener('click', async (e) => {
   }
 });
 
+document.getElementById('namesBody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.release-name-btn');
+  if(!btn) return;
+  const clientId = btn.dataset.clientid;
+  const name = btn.dataset.name;
+  if(!confirm(`Release the name "${name}"?\n\nWhoever had it will lose it, and anyone (including them, if they claim a new device ID) can claim it fresh.`)) return;
+  btn.disabled = true;
+  btn.textContent = '...';
+  const ok = await releaseName(clientId);
+  if(ok){
+    btn.closest('tr').remove();
+  } else {
+    alert('Could not release — try again.');
+    btn.disabled = false;
+    btn.textContent = '🗑️ Release';
+  }
+});
+
+document.getElementById('nameReportsBody').addEventListener('click', async (e) => {
+  const releaseBtn = e.target.closest('.release-reported-name-btn');
+  if(releaseBtn){
+    const clientId = releaseBtn.dataset.clientid;
+    const reportId = releaseBtn.dataset.reportid;
+    if(!confirm('Release this name and dismiss the report?\n\nThe person will lose their claimed name.')) return;
+    releaseBtn.disabled = true;
+    releaseBtn.textContent = '...';
+    const releaseOk = await releaseName(clientId);
+    if(releaseOk){
+      await dismissNameReport(reportId);
+      releaseBtn.closest('tr').remove();
+      loadAll(); // refresh so the Leaderboard Names table above reflects the release too
+    } else {
+      alert('Could not release — try again.');
+      releaseBtn.disabled = false;
+      releaseBtn.textContent = 'Release name';
+    }
+    return;
+  }
+
+  const dismissBtn = e.target.closest('.dismiss-name-report-btn');
+  if(dismissBtn){
+    const reportId = dismissBtn.dataset.reportid;
+    dismissBtn.disabled = true;
+    dismissBtn.textContent = '...';
+    const ok = await dismissNameReport(reportId);
+    if(ok){
+      dismissBtn.closest('tr').remove();
+    } else {
+      alert('Could not dismiss — try again.');
+      dismissBtn.disabled = false;
+      dismissBtn.textContent = 'Dismiss';
+    }
+  }
+});
+
 document.getElementById('missingBody').addEventListener('click', async (e) => {
   const btn = e.target.closest('.dismiss-missing-btn');
   if(!btn) return;
@@ -737,6 +890,23 @@ document.getElementById('missingBody').addEventListener('click', async (e) => {
     btn.disabled = false;
     btn.textContent = '✕ Dismiss';
   }
+});
+
+// Leaderboard Names section starts collapsed to save space — it's an occasional-use tool
+document.getElementById('namesSection').classList.add('collapsed');
+document.getElementById('namesToggle').addEventListener('click', () => {
+  const section = document.getElementById('namesSection');
+  const arrow = document.getElementById('namesArrow');
+  const collapsed = section.classList.toggle('collapsed');
+  arrow.textContent = collapsed ? '▾' : '▸';
+});
+
+// All Locations starts expanded (it's the main table), but can be collapsed too
+document.getElementById('locationsToggle').addEventListener('click', () => {
+  const section = document.getElementById('locationsSection');
+  const arrow = document.getElementById('locationsArrow');
+  const collapsed = section.classList.toggle('collapsed');
+  arrow.textContent = collapsed ? '▾' : '▸';
 });
 
 loadAll();

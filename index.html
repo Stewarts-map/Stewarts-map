@@ -135,15 +135,20 @@
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
     padding:5px 10px;border-radius:6px;cursor:pointer;
   }
+  #leaderboardToggle{
+    position:absolute;top:78px;right:10px;z-index:500;font-size:12px;font-weight:700;
+    background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
+    padding:5px 10px;border-radius:6px;cursor:pointer;
+  }
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
   #locateBtn{
-    position:absolute;top:88px;right:10px;z-index:500;
+    position:absolute;top:122px;right:10px;z-index:500;
     background:#2196f3;color:#fff;border:none;border-radius:50px;
     padding:11px 14px;font-weight:700;font-size:13.5px;box-shadow:0 3px 10px rgba(0,0,0,.4);
     cursor:pointer;
   }
   #nearestInfo{
-    position:absolute;top:136px;right:10px;z-index:500;
+    position:absolute;top:170px;right:10px;z-index:500;
     background:var(--panel-bg);color:var(--cream);border:1px solid #2196f3;
     border-radius:8px;padding:8px 12px;font-size:13px;max-width:220px;display:none;
     cursor:pointer;line-height:1.4;
@@ -200,6 +205,19 @@
   .list-item .list-item-name{font-weight:700;font-size:14.5px;}
   .list-item .list-item-addr{font-size:12px;color:var(--muted);margin-top:2px;}
   .list-item:active{background:rgba(255,255,255,.08);}
+  #leaderboardPanel{
+    position:absolute;inset:0;z-index:1500;background:var(--charcoal);display:none;
+    flex-direction:column;
+  }
+  #leaderboardPanel.show{display:flex;}
+  #leaderboardClose{background:none;border:none;color:var(--cream);font-size:22px;cursor:pointer;}
+  .leaderboard-row{
+    padding:10px 16px;border-bottom:1px solid #333;color:var(--cream);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .leaderboard-rank{font-weight:800;color:var(--amber);width:28px;flex:none;}
+  .leaderboard-name{flex:1;font-weight:700;}
+  .leaderboard-count{color:var(--muted);font-size:13px;}
   #installBanner{
     position:fixed;left:0;right:0;bottom:0;z-index:2000;
     background:var(--header-grad-top);border-top:2px solid var(--amber);
@@ -237,14 +255,14 @@
   </p>
   <p id="achievementBadge" style="margin-top:6px;font-weight:600;color:var(--amber);">🏆 Rate a spot to start earning badges</p>
   <p id="weeklyRecap" style="margin-top:4px;font-size:14px;color:var(--muted);"></p>
-  <p id="streakBadge" style="margin-top:4px;font-size:14px;color:var(--muted);"></p>
+  <p id="mostRecentBadge" style="margin-top:4px;font-size:14px;color:var(--muted);cursor:pointer;"></p>
 </div>
 
 <div id="mapWrap">
 <div id="legend">
   <div id="legendToggle">🔑 Key <span id="legendArrow">▾</span></div>
   <div id="legendBody">
-    <div><span class="dot" style="background:#1e88e5"></span>5★ bathroom</div>
+    <div><span class="dot" style="background:#1e88e5"></span>5★ bathroom = ⭐ star pin</div>
     <div><span class="dot" style="background:#43a047"></span>4★</div>
     <div><span class="dot" style="background:#fdd835"></span>3★</div>
     <div><span class="dot" style="background:#fb8c00"></span>2★</div>
@@ -256,6 +274,7 @@
 
 <button id="openNowToggle">🕐 Open now</button>
 <button id="listViewToggle">📋 List</button>
+<button id="leaderboardToggle">🏆 Leaderboard</button>
 
 <div id="map"></div>
 <button id="locateBtn">📍 Where am I?</button>
@@ -280,6 +299,7 @@
       <li>🧭 First time using Directions, you'll pick Google Maps, Waze, or Apple Maps — it's remembered after that.</li>
       <li>🔗 <b>Share</b> a pin, or 🚩 <b>Report</b> a problem (wrong info, permanently closed, etc.) — right in each pin's popup.</li>
       <li>📋 Use <b>List</b> to browse every location, or <b>Where am I?</b> to find the closest one.</li>
+      <li>🏆 Claim a name on the <b>Leaderboard</b> to see how many spots you've rated compared to others.</li>
     </ul>
     <p style="font-size:11.5px;color:#888;border-top:1px solid #ddd;padding-top:10px;margin-bottom:6px;">
       Unofficial fan project — not affiliated with or endorsed by Stewart's Shops. Store hours shown may vary or be out of date — always call ahead if it matters.
@@ -296,6 +316,22 @@
   </div>
   <div id="listViewItems"></div>
 </div>
+</div>
+
+<div id="leaderboardPanel">
+  <div id="listViewHeader">
+    <span>🏆 Leaderboard</span>
+    <button id="leaderboardClose">✕</button>
+  </div>
+  <div style="padding:14px 16px;border-bottom:1px solid #333;">
+    <div class="rating-label" style="color:var(--cream);margin-bottom:6px;">Your leaderboard name</div>
+    <div class="tip-input-row">
+      <input type="text" id="displayNameInput" maxlength="20" placeholder="e.g. Stewart S." style="background:#fff;color:#1c1c1e;" />
+      <button class="btn btn-amber" id="displayNameSave">Save</button>
+    </div>
+    <div class="save-note" id="displayNameNote" style="height:auto;"></div>
+  </div>
+  <div id="leaderboardItems" style="flex:1;overflow-y:auto;padding:8px 0;"></div>
 </div>
 
 <script>
@@ -704,12 +740,14 @@ map.on('popupopen', () => {
   document.getElementById('legendBody').classList.add('collapsed');
   document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
+  document.getElementById('leaderboardToggle').style.display = 'none';
 });
 map.on('popupclose', () => {
   document.getElementById('locateBtn').style.display = '';
   document.getElementById('missingBtn').style.display = '';
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
+  document.getElementById('leaderboardToggle').style.display = '';
   const wasCollapsed = localStorage.getItem('legendCollapsed') === '1';
   if(!wasCollapsed) document.getElementById('legendBody').classList.remove('collapsed');
 
@@ -721,9 +759,15 @@ map.on('popupclose', () => {
   }
 });
 
+// Two tile sources now: satellite imagery for light mode, street map (with a CSS invert
+// trick) for dark mode. OpenStreetMap doesn't offer imagery itself, so satellite comes from
+// Esri's free, no-API-key World Imagery service — long-established and widely used, though
+// it is a second external dependency worth keeping in mind if tiles ever fail to load.
 // Single tile source (the one we know reliably works) — dark mode is done with a CSS
 // color-invert trick on the tile layer itself, rather than depending on a second external
-// tile server that may be blocked, rate-limited, or require an account.
+// tile server. (We tried Esri satellite imagery for light mode, but it turned out to have
+// the same reliability problem as the CARTO dark tiles did earlier — Esri increasingly
+// requires a developer account/API key for consistent free access.)
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19
@@ -795,6 +839,23 @@ function makeIcon(id){
     ? `<span style="color:#fff;font-weight:800;font-size:${Math.round(size*0.5)}px;text-shadow:0 1px 2px rgba(0,0,0,.7);">${roundedStar}</span>`
     : '';
 
+  // 5-star bathrooms get a distinctive star-shaped pin instead of circle/diamond — makes
+  // the very best spots visually pop out on the map at a glance
+  if(roundedStar === 5){
+    const starClip = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+    const outer = size + 5;
+    return L.divIcon({
+      className:'',
+      html:`<div style="position:relative;width:${outer}px;height:${outer}px;filter:drop-shadow(0 0 2px rgba(0,0,0,.6));">
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${outer}px;height:${outer}px;background:#fff;clip-path:${starClip};"></div>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${size}px;height:${size}px;background:${color};clip-path:${starClip};"></div>
+              <div style="position:absolute;top:56%;left:50%;transform:translate(-50%,-50%);">${labelHtml}</div>
+            </div>`,
+      iconSize:[outer, outer],
+      iconAnchor:[outer/2, outer/2]
+    });
+  }
+
   if(reviewedByMe){
     // Diamond shape for anything YOU'VE personally rated — same color scale, different silhouette
     const inner = Math.round(size * 0.72);
@@ -859,6 +920,90 @@ function getClientId(){
     localStorage.setItem('stewarts_client_id', id);
   }
   return id;
+}
+
+// Leaderboard display names — no login, just an anonymous device ID claiming a name.
+// Uniqueness is enforced by checking whether any OTHER device already claimed it.
+async function loadMyDisplayName(){
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'displayNames', getClientId()));
+    return snap.exists() ? snap.data().name : null;
+  }catch(e){
+    return null;
+  }
+}
+
+async function reportName(clientId, name){
+  try{
+    const {db, collection, addDoc} = await fb();
+    await addDoc(collection(db, 'nameReports'), { clientId, name, ts: Date.now() });
+    return true;
+  }catch(e){
+    console.error('reportName failed', e);
+    return false;
+  }
+}
+
+async function claimDisplayName(name){
+  const trimmed = name.trim().slice(0, 20);
+  if(!trimmed) return { ok: false, reason: 'Type a name first.' };
+  const normalized = trimmed.toLowerCase();
+  try{
+    const {db, doc, getDoc, setDoc, collection, query, where, getDocs} = await fb();
+    const myId = getClientId();
+
+    // Check if anyone ELSE already has this name
+    const q = query(collection(db, 'displayNames'), where('nameLower', '==', normalized));
+    const snap = await getDocs(q);
+    const takenByOther = snap.docs.some(d => d.id !== myId);
+    if(takenByOther){
+      return { ok: false, reason: `"${trimmed}" is already taken — try another.` };
+    }
+
+    await setDoc(doc(db, 'displayNames', myId), {
+      name: trimmed, nameLower: normalized, updatedAt: Date.now()
+    });
+    return { ok: true, name: trimmed };
+  }catch(e){
+    console.error('claimDisplayName failed', e);
+    return { ok: false, reason: 'Something went wrong — try again.' };
+  }
+}
+
+async function loadLeaderboard(){
+  try{
+    const {db, collection, getDocs} = await fb();
+
+    // Count distinct locations rated per device (not total star clicks)
+    const votesSnap = await getDocs(collection(db, 'votes'));
+    const locsByClient = {};
+    votesSnap.forEach(d => {
+      const v = d.data();
+      const cid = v.clientId;
+      if(!cid) return;
+      if((v.store > 0) || (v.bathroom > 0)){
+        if(!locsByClient[cid]) locsByClient[cid] = new Set();
+        locsByClient[cid].add(v.locId || d.id.split('_')[0]);
+      }
+    });
+
+    const namesSnap = await getDocs(collection(db, 'displayNames'));
+    const namesByClient = {};
+    namesSnap.forEach(d => { namesByClient[d.id] = d.data().name; });
+
+    // Only show devices that have actually set a name — encourages naming yourself
+    const ranked = Object.keys(locsByClient)
+      .filter(cid => namesByClient[cid])
+      .map(cid => ({ clientId: cid, name: namesByClient[cid], count: locsByClient[cid].size }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+
+    return ranked;
+  }catch(e){
+    console.error('loadLeaderboard failed', e);
+    return null;
+  }
 }
 
 // Checked once per page load — if a moderator blocked this device in FlushPanel, further ratings/tips are refused
@@ -1223,8 +1368,30 @@ async function loadAllRatings(){
     }
   }));
   updateAchievementBadge();
-  renderStreakDisplay();
+  updateMostRecentBadge();
   map.invalidateSize(); // header height just changed (badges filled in) — tell Leaflet to recalculate
+}
+
+// Highlights whichever location was rated most recently, anywhere on the map
+function updateMostRecentBadge(){
+  const el = document.getElementById('mostRecentBadge');
+  if(!el) return;
+  let mostRecentLoc = null;
+  let mostRecentTs = 0;
+  seedLocations.forEach(loc => {
+    const agg = ratingsCache[loc.id];
+    if(agg && agg.lastUpdated && agg.lastUpdated > mostRecentTs){
+      mostRecentTs = agg.lastUpdated;
+      mostRecentLoc = loc;
+    }
+  });
+  if(!mostRecentLoc){
+    el.textContent = '';
+    el.onclick = null;
+    return;
+  }
+  el.textContent = `🕐 Most recently rated: ${mostRecentLoc.n} — ${relativeTimeFromNow(mostRecentTs)}`;
+  el.onclick = () => zoomToMarker(markers[mostRecentLoc.id]);
 }
 
 // Achievements — purely local/cosmetic, counts locations YOU'VE personally rated
@@ -1250,45 +1417,6 @@ function currentTier(count){
     if(count >= t.min) tier = t;
   }
   return tier;
-}
-// Streak tracking — consecutive days (this device) with at least one rating submitted
-function getTodayStr(){
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-}
-function daysBetween(d1Str, d2Str){
-  const d1 = new Date(d1Str + 'T00:00:00');
-  const d2 = new Date(d2Str + 'T00:00:00');
-  return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-}
-function renderStreakDisplay(){
-  const el = document.getElementById('streakBadge');
-  if(!el) return;
-  const lastActive = localStorage.getItem('streakLastDate');
-  const streak = parseInt(localStorage.getItem('streakCount') || '0', 10);
-  const today = getTodayStr();
-  if(!lastActive || streak === 0){
-    el.textContent = '';
-  } else if(daysBetween(lastActive, today) > 1){
-    el.textContent = `🔥 Streak ended at ${streak} day${streak===1?'':'s'} — rate a spot today to start a new one!`;
-  } else {
-    el.textContent = `🔥 ${streak}-day streak — rate again tomorrow to keep it going!`;
-  }
-}
-function recordStreakActivity(){
-  const today = getTodayStr();
-  const lastActive = localStorage.getItem('streakLastDate');
-  let streak = parseInt(localStorage.getItem('streakCount') || '0', 10);
-  if(lastActive === today){
-    // already counted today, no change
-  } else if(lastActive && daysBetween(lastActive, today) === 1){
-    streak += 1;
-  } else {
-    streak = 1;
-  }
-  localStorage.setItem('streakLastDate', today);
-  localStorage.setItem('streakCount', String(streak));
-  renderStreakDisplay();
 }
 
 let lastKnownTierMin = 0;
@@ -1409,7 +1537,6 @@ function attachStarHandlers(loc){
 
         if(markers[loc.id]) markers[loc.id].setIcon(makeIcon(loc.id));
         updateAchievementBadge();
-        recordStreakActivity();
       });
     });
   });
@@ -1622,6 +1749,82 @@ document.getElementById('listViewClose').addEventListener('click', () => {
   suppressNextLocateClick = true;
   setTimeout(() => { suppressNextLocateClick = false; }, 400);
 });
+
+// Leaderboard panel
+async function openLeaderboard(){
+  document.getElementById('leaderboardPanel').classList.add('show');
+  const nameInput = document.getElementById('displayNameInput');
+  const existingName = await loadMyDisplayName();
+  if(existingName) nameInput.value = existingName;
+
+  const itemsEl = document.getElementById('leaderboardItems');
+  itemsEl.innerHTML = '<div style="padding:16px;color:#999;">Loading...</div>';
+  const ranked = await loadLeaderboard();
+  if(ranked === null){
+    itemsEl.innerHTML = '<div style="padding:16px;color:#999;">Could not load the leaderboard — try again.</div>';
+    return;
+  }
+  if(ranked.length === 0){
+    itemsEl.innerHTML = '<div style="padding:16px;color:#999;">No one\'s claimed a name yet — be the first!</div>';
+    return;
+  }
+  itemsEl.innerHTML = ranked.map((r, i) =>
+    `<div class="leaderboard-row">
+      <span class="leaderboard-rank">#${i+1}</span>
+      <span class="leaderboard-name">${escapeHtml(r.name)}</span>
+      <span class="leaderboard-count">${r.count} rated</span>
+      <button class="report-name-btn" data-clientid="${r.clientId}" data-name="${escapeHtml(r.name)}" title="Report this name" style="background:none;border:none;color:#e57373;cursor:pointer;font-size:13px;padding:0 0 0 8px;">🚩</button>
+    </div>`
+  ).join('');
+}
+
+document.getElementById('leaderboardToggle').addEventListener('click', openLeaderboard);
+document.getElementById('leaderboardClose').addEventListener('click', () => {
+  document.getElementById('leaderboardPanel').classList.remove('show');
+  suppressNextLocateClick = true;
+  setTimeout(() => { suppressNextLocateClick = false; }, 400);
+});
+document.getElementById('displayNameSave').addEventListener('click', async () => {
+  const input = document.getElementById('displayNameInput');
+  const note = document.getElementById('displayNameNote');
+  const btn = document.getElementById('displayNameSave');
+  btn.disabled = true;
+  btn.textContent = '...';
+  const result = await claimDisplayName(input.value);
+  if(result.ok){
+    note.style.color = '#4caf50';
+    note.textContent = `Saved! You're "${result.name}" on the leaderboard.`;
+    openLeaderboard(); // refresh the list to reflect the change
+  } else {
+    note.style.color = '#e57373';
+    note.textContent = result.reason;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Save';
+});
+
+document.getElementById('leaderboardItems').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.report-name-btn');
+  if(!btn) return;
+  if(btn.dataset.confirming !== '1'){
+    // First tap — ask for confirmation instead of submitting immediately
+    btn.dataset.confirming = '1';
+    btn.textContent = 'Sure?';
+    setTimeout(() => {
+      if(btn.dataset.confirming === '1'){
+        btn.dataset.confirming = '0';
+        btn.textContent = '🚩';
+      }
+    }, 3000);
+    return;
+  }
+  btn.dataset.confirming = '0';
+  btn.disabled = true;
+  btn.textContent = '...';
+  const ok = await reportName(btn.dataset.clientid, btn.dataset.name);
+  btn.textContent = ok ? '✅' : '❌';
+});
+
 document.getElementById('listViewItems').addEventListener('click', (e) => {
   const item = e.target.closest('.list-item');
   if(!item) return;
