@@ -121,20 +121,15 @@
     background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
     padding:5px 10px;border-radius:6px;cursor:pointer;
   }
-  #surpriseMeBtn{
-    position:absolute;top:78px;right:10px;z-index:500;font-size:12px;font-weight:700;
-    background:var(--panel-bg);color:var(--cream);border:1px solid var(--panel-border);
-    padding:5px 10px;border-radius:6px;cursor:pointer;
-  }
   .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
   #locateBtn{
-    position:absolute;top:122px;right:10px;z-index:500;
+    position:absolute;top:88px;right:10px;z-index:500;
     background:#2196f3;color:#fff;border:none;border-radius:50px;
     padding:11px 14px;font-weight:700;font-size:13.5px;box-shadow:0 3px 10px rgba(0,0,0,.4);
     cursor:pointer;
   }
   #nearestInfo{
-    position:absolute;top:170px;right:10px;z-index:500;
+    position:absolute;top:136px;right:10px;z-index:500;
     background:var(--panel-bg);color:var(--cream);border:1px solid #2196f3;
     border-radius:8px;padding:8px 12px;font-size:13px;max-width:220px;display:none;
     cursor:pointer;line-height:1.4;
@@ -223,11 +218,12 @@
       <a href="https://cash.app/$BathroomReport" target="_blank" rel="noopener" style="flex:none;background:#00C244;color:#fff;text-decoration:none;font-weight:700;font-size:12.5px;padding:7px 10px;border-radius:8px;white-space:nowrap;">🍔 Buy me lunch</a>
     </div>
   </div>
-  <p>Tap a pin to rate the store &amp; bathroom.</p>
+  <p>Tap a pin to rate the store &amp; bathroom.
+    <button id="infoBtn" title="About this app" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;vertical-align:middle;padding:0 0 0 4px;">ℹ️</button>
+  </p>
   <p id="achievementBadge" style="margin-top:6px;font-weight:600;color:var(--amber);">🏆 Rate a spot to start earning badges</p>
   <p id="weeklyRecap" style="margin-top:4px;font-size:14px;color:var(--muted);"></p>
   <p id="streakBadge" style="margin-top:4px;font-size:14px;color:var(--muted);"></p>
-  <p style="margin-top:6px;font-size:11px;color:var(--muted);opacity:0.8;">Unofficial fan project — not affiliated with or endorsed by Stewart's Shops. Store hours shown may vary or be out of date — always call ahead if it matters.</p>
 </div>
 
 <div id="mapWrap">
@@ -246,7 +242,6 @@
 
 <button id="openNowToggle">🕐 Open now</button>
 <button id="listViewToggle">📋 List</button>
-<button id="surpriseMeBtn">🎲 Surprise Me</button>
 
 <div id="map"></div>
 <button id="locateBtn">📍 Where am I?</button>
@@ -272,8 +267,10 @@
       <li>🕐 Hours shown are <b>live</b> — the map knows if a spot is open right now.</li>
       <li>🧭 First time using Directions, you'll pick Google Maps, Waze, or Apple Maps — it's remembered after that.</li>
       <li>📋 Use <b>List</b> to browse every location, or <b>Where am I?</b> to find the closest one.</li>
-      <li>🎲 Feeling adventurous? Try <b>Surprise Me</b> for a random pick.</li>
     </ul>
+    <p style="font-size:11.5px;color:#888;border-top:1px solid #ddd;padding-top:10px;margin-bottom:14px;">
+      Unofficial fan project — not affiliated with or endorsed by Stewart's Shops. Store hours shown may vary or be out of date — always call ahead if it matters.
+    </p>
     <button id="onboardingClose" class="btn btn-amber" style="width:100%;">Got it!</button>
   </div>
 </div>
@@ -653,7 +650,7 @@ try{
 function zoomToMarker(marker){
   if(!marker) return;
   // After centering, nudge the view so the marker lands lower on screen, clear of the
-  // stacked buttons (Open Now / List / Surprise Me / Where am I?) in the top-right corner —
+  // stacked buttons (Open Now / List / Where am I?) in the top-right corner —
   // on short viewports (tall header + Android Chrome's address bar), dead-center can end up
   // hidden right underneath that button stack.
   const nudgeDown = () => map.panBy([0, -110], { animate: false });
@@ -683,14 +680,12 @@ map.on('popupopen', () => {
   document.getElementById('legendBody').classList.add('collapsed');
   document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
-  document.getElementById('surpriseMeBtn').style.display = 'none';
 });
 map.on('popupclose', () => {
   document.getElementById('locateBtn').style.display = '';
   document.getElementById('missingBtn').style.display = '';
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
-  document.getElementById('surpriseMeBtn').style.display = '';
   const wasCollapsed = localStorage.getItem('legendCollapsed') === '1';
   if(!wasCollapsed) document.getElementById('legendBody').classList.remove('collapsed');
 });
@@ -1455,6 +1450,9 @@ document.getElementById('onboardingClose').addEventListener('click', () => {
   localStorage.setItem('onboardingSeen', '1');
   document.getElementById('onboardingOverlay').classList.remove('show');
 });
+document.getElementById('infoBtn').addEventListener('click', () => {
+  document.getElementById('onboardingOverlay').classList.add('show');
+});
 
 // If this page was opened via a shared link (?loc=xyz), jump straight to that pin
 (function(){
@@ -1609,52 +1607,6 @@ document.getElementById('listViewItems').addEventListener('click', (e) => {
     if(marker) zoomToMarker(marker);
   }, 50);
 });
-
-// Surprise Me — picks a random spot, favoring ones nobody's rated yet
-document.getElementById('surpriseMeBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('surpriseMeBtn');
-  btn.disabled = true;
-  const originalText = btn.textContent;
-  btn.textContent = '🎲 Finding one...';
-
-  const pos = await getVerifiedPosition();
-  const isUnrated = loc => {
-    const agg = ratingsCache[loc.id];
-    return !agg || agg.bathroomCount === 0;
-  };
-
-  let pick;
-  if(pos){
-    const withDist = seedLocations.map(loc => ({
-      loc,
-      dist: milesBetween(pos.lat, pos.lng, loc.lat, loc.lng)
-    }));
-    // Tier 1: unrated AND within 20 miles — the ideal case
-    let candidates = withDist.filter(x => isUnrated(x.loc) && x.dist <= 20);
-    // Tier 2: no nearby unrated ones — widen to the 15 nearest unrated spots, regardless of distance
-    if(candidates.length === 0){
-      candidates = withDist.filter(x => isUnrated(x.loc)).sort((a,b) => a.dist - b.dist).slice(0, 15);
-    }
-    // Tier 3: everything's rated near you — just pick from the 15 nearest overall
-    if(candidates.length === 0){
-      candidates = [...withDist].sort((a,b) => a.dist - b.dist).slice(0, 15);
-    }
-    pick = candidates[Math.floor(Math.random() * candidates.length)].loc;
-  } else {
-    // No location available — fall back to any unrated spot on the whole map
-    const unrated = seedLocations.filter(isUnrated);
-    const pool = unrated.length > 0 ? unrated : seedLocations;
-    pick = pool[Math.floor(Math.random() * pool.length)];
-  }
-
-  const marker = markers[pick.id];
-  if(navigator.vibrate) navigator.vibrate(20);
-  if(marker) zoomToMarker(marker);
-
-  btn.disabled = false;
-  btn.textContent = originalText;
-});
-
 
 // "My Location" — find the user and the nearest Stewart's to them
 function milesBetween(lat1, lng1, lat2, lng2){
