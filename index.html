@@ -268,9 +268,10 @@
       <li>🧭 First time using Directions, you'll pick Google Maps, Waze, or Apple Maps — it's remembered after that.</li>
       <li>📋 Use <b>List</b> to browse every location, or <b>Where am I?</b> to find the closest one.</li>
     </ul>
-    <p style="font-size:11.5px;color:#888;border-top:1px solid #ddd;padding-top:10px;margin-bottom:14px;">
+    <p style="font-size:11.5px;color:#888;border-top:1px solid #ddd;padding-top:10px;margin-bottom:6px;">
       Unofficial fan project — not affiliated with or endorsed by Stewart's Shops. Store hours shown may vary or be out of date — always call ahead if it matters.
     </p>
+    <p style="font-size:11px;color:#aaa;margin-bottom:14px;">Last updated: July 14, 2026</p>
     <button id="onboardingClose" class="btn btn-amber" style="width:100%;">Got it!</button>
   </div>
 </div>
@@ -649,21 +650,20 @@ try{
 // (plain L.layerGroup fallback doesn't have zoomToShowLayer)
 function zoomToMarker(marker){
   if(!marker) return;
-  // After centering, nudge the view so the marker lands lower on screen, clear of the
-  // stacked buttons (Open Now / List / Where am I?) in the top-right corner —
-  // on short viewports (tall header + Android Chrome's address bar), dead-center can end up
-  // hidden right underneath that button stack.
-  const nudgeDown = () => map.panBy([0, -110], { animate: false });
-  if(typeof markerCluster.zoomToShowLayer === 'function'){
-    markerCluster.zoomToShowLayer(marker, () => {
-      nudgeDown();
-      marker.openPopup();
-    });
-  } else {
-    map.setView(marker.getLatLng(), 16);
-    nudgeDown();
+  // Bypass the clustering plugin's zoomToShowLayer entirely — it's been an unreliable
+  // source of Android-specific bugs (silent failures where the callback just never fires).
+  // Instead: zoom/pan directly, then open the popup once the move settles, with a safety-net
+  // timeout in case 'moveend' never fires (e.g. already at that exact view).
+  let done = false;
+  const finish = () => {
+    if(done) return;
+    done = true;
+    map.panBy([0, -110], { animate: false }); // nudge marker down, clear of the button stack
     marker.openPopup();
-  }
+  };
+  map.once('moveend', finish);
+  map.setView(marker.getLatLng(), 16);
+  setTimeout(finish, 600); // safety net — guarantees the popup opens even if moveend doesn't fire
 }
 
 // Safety net: recalculate map size whenever the viewport or layout might have changed
