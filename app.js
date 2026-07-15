@@ -46,11 +46,28 @@ map.addLayer(markerCluster);
 function positionSelectedMarker(marker, animate = false){
   if(!marker) return;
 
-  const mapSize = map.getSize();
+  const mapEl = map.getContainer();
+  const mapRect = mapEl.getBoundingClientRect();
   const markerPoint = map.latLngToContainerPoint(marker.getLatLng());
 
-  const desiredX = mapSize.x * 0.5;
-  const desiredY = mapSize.y * 0.78;
+  // Use the actually visible viewport, then subtract the header/map top.
+  // This avoids positioning the pin too low on phones with a tall header
+  // or browser controls taking up part of the screen.
+  const viewportHeight = window.visualViewport
+    ? window.visualViewport.height
+    : window.innerHeight;
+
+  const visibleMapBottom = Math.min(mapRect.bottom, viewportHeight);
+  const visibleMapHeight = Math.max(1, visibleMapBottom - mapRect.top);
+
+  const desiredX = mapRect.width * 0.5;
+
+  // Put the pin roughly two-thirds down the visible MAP area.
+  // The popup then has room to grow upward without being cut off.
+  const desiredY = Math.min(
+    visibleMapHeight * 0.72,
+    visibleMapHeight - 78
+  );
 
   const offsetX = markerPoint.x - desiredX;
   const offsetY = markerPoint.y - desiredY;
