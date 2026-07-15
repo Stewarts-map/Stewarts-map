@@ -231,26 +231,39 @@ const conditionCache = {};
 
 // Cycles through whichever states this amenity defines (most are Not sure/Yes/No, but
 // Restroom type instead cycles Not sure/Single-person/Multiple stalls)
-function amenityStates(a){
-  return a.states || ['unknown', 'yes', 'no'];
-}
 function amenityStateLabel(a, val){
   const labels = a.stateLabels || {unknown:'Not sure', yes:'Yes', no:'No'};
   return labels[val] || 'Not sure';
 }
-function nextAmenityValue(a, val){
-  const states = amenityStates(a);
-  const idx = states.indexOf(val);
-  return states[(idx + 1) % states.length];
+
+// Icons for each possible answer value across all amenities (both yes/no and the
+// restroom-type single/multiple states)
+const AMENITY_ANSWER_ICONS = {yes:'✅', no:'❌', unknown:'🤷', single:'🚪', multiple:'🚻'};
+
+// Renders whichever single question comes next (the first one this person hasn't answered
+// yet), or a friendly completion message once every feature has an answer on record.
+function renderAmenityStepHtml(myVote){
+  const mine = myVote.amenities || {};
+  const idx = BATHROOM_AMENITIES.findIndex(a => mine[a.key] === undefined);
+  if(idx === -1){
+    return `<div class="amenity-complete">🚽 That's everything — thanks for the intel!</div>`;
+  }
+  const a = BATHROOM_AMENITIES[idx];
+  const states = a.states || ['unknown', 'yes', 'no'];
+  const buttons = states.map(s =>
+    `<button type="button" class="amenity-answer-btn" data-key="${a.key}" data-value="${s}">${AMENITY_ANSWER_ICONS[s] || '•'} ${amenityStateLabel(a, s)}</button>`
+  ).join('');
+  return `<div class="amenity-progress">Feature ${idx + 1} of ${BATHROOM_AMENITIES.length}</div>
+    <div class="amenity-question-label">${a.label}</div>
+    <div class="amenity-answer-row">${buttons}</div>`;
 }
 
 function amenityEditorHtml(locId, myVote){
-  const mine = myVote.amenities || {};
-  const chips = BATHROOM_AMENITIES.map(a => {
-    const val = mine[a.key] || 'unknown';
-    return `<button type="button" class="amenity-chip amenity-chip-${val}" data-value="${val}" id="amenity-${a.key}-${locId}">${a.label}: <span class="amenity-chip-state">${amenityStateLabel(a, val)}</span></button>`;
-  }).join('');
-  return `<div class="amenities-editor"><div class="feature-title">🚻 Bathroom features you saw</div><div class="amenity-chip-row">${chips}</div><button class="btn btn-secondary amenities-save" id="amenities-save-${locId}">Save features</button><div class="save-note" id="amenities-note-${locId}"></div></div>`;
+  return `<div class="amenities-editor">
+    <div class="feature-title">🚻 Bathroom features you saw</div>
+    <div class="amenity-step" id="amenity-step-${locId}">${renderAmenityStepHtml(myVote)}</div>
+    <div class="save-note" id="amenities-note-${locId}"></div>
+  </div>`;
 }
 
 function amenitySummaryHtml(summary){
@@ -1007,39 +1020,52 @@ async function attachAmenityHandlers(loc){
   const summary=await loadAmenitySummary(loc.id);
   if(summaryEl) summaryEl.innerHTML=amenitySummaryHtml(summary);
 
-  // Each chip cycles through its own states on tap — no native picker
-  BATHROOM_AMENITIES.forEach(a => {
-    const chipOrig = document.getElementById(`amenity-${a.key}-${loc.id}`);
-    if(!chipOrig) return;
-    const chip = chipOrig.cloneNode(true);
-    chipOrig.parentNode.replaceChild(chip, chipOrig);
-    chip.addEventListener('click', () => {
-      const next = nextAmenityValue(a, chip.dataset.value);
-      chip.dataset.value = next;
-      chip.className = 'amenity-chip amenity-chip-' + next;
-      const stateSpan = chip.querySelector('.amenity-chip-state');
-      if(stateSpan) stateSpan.textContent = amenityStateLabel(a, next);
-      if(navigator.vibrate) navigator.vibrate(10);
-    });
-  });
+  const stepOrig = document.getElementById('amenity-step-' + loc.id);
+  if(!stepOrig) return;
+  const stepEl = stepOrig.cloneNode(true);
+  stepOrig.parentNode.replaceChild(stepEl, stepOrig);
 
-  const btnOrig=document.getElementById('amenities-save-'+loc.id);
-  if(!btnOrig) return;
-  const btn=btnOrig.cloneNode(true); btnOrig.parentNode.replaceChild(btn,btnOrig);
-  btn.addEventListener('click', async()=>{
-    const note=document.getElementById('amenities-note-'+loc.id);
-    if(note) note.textContent='Checking you\'re nearby…';
-    const verification=await verifyNearby(loc);
-    if(!verification.ok){ if(note){note.style.color='#c62828';note.textContent='📍 You need to be at this Stewart\'s to report its features.';} return; }
-    const amenities={};
-    BATHROOM_AMENITIES.forEach(a=>{ const el=document.getElementById(`amenity-${a.key}-${loc.id}`); amenities[a.key]=el ? el.dataset.value : 'unknown'; });
-    const vote={...(myVoteCache[loc.id]||emptyVote()), amenities};
-    myVoteCache[loc.id]=vote;
-    btn.disabled=true;
-    const ok=await saveMyVote(loc.id,vote);
-    btn.disabled=false;
-    if(note){note.style.color=ok?'#2f6b3c':'#c62828';note.textContent=ok?'Features saved ✓':'Could not save features';}
-    if(ok){ const fresh=await loadAmenitySummary(loc.id); if(summaryEl) summaryEl.innerHTML=amenitySummaryHtml(fresh); }
+  // One delegated listener handles every step — since we only ever update stepEl's
+  // innerHTML (never replace stepEl itself), this same listener keeps working as the
+  // question changes underneath it.
+  stepEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.amenity-answer-btn');
+    if(!btn) return;
+    const key = btn.dataset.key;
+    const value = btn.dataset.value;
+    const note = document.getElementById('amenities-note-' + loc.id);
+    const allBtns = stepEl.querySelectorAll('.amenity-answer-btn');
+
+    allBtns.forEach(b => b.disabled = true);
+    if(note){ note.style.color=''; note.textContent = "Checking you're nearby…"; }
+
+    const verification = await verifyNearby(loc);
+    if(!verification.ok){
+      if(note){ note.style.color = '#c62828'; note.textContent = "📍 You need to be at this Stewart's to report its features."; }
+      allBtns.forEach(b => b.disabled = false);
+      return;
+    }
+
+    const myVote = myVoteCache[loc.id] || emptyVote();
+    const amenities = { ...(myVote.amenities || {}), [key]: value };
+    const updatedVote = { ...myVote, amenities };
+    myVoteCache[loc.id] = updatedVote;
+
+    const ok = await saveMyVote(loc.id, updatedVote);
+    if(!ok){
+      if(note){ note.style.color = '#c62828'; note.textContent = 'Could not save — try again.'; }
+      allBtns.forEach(b => b.disabled = false);
+      return;
+    }
+
+    if(note) note.textContent = '';
+    if(navigator.vibrate) navigator.vibrate(10);
+
+    // Auto-advance to the next unanswered feature (or show the completion message)
+    stepEl.innerHTML = renderAmenityStepHtml(updatedVote);
+
+    const fresh = await loadAmenitySummary(loc.id);
+    if(summaryEl) summaryEl.innerHTML = amenitySummaryHtml(fresh);
   });
 }
 

@@ -1,19 +1,19 @@
 :root{
-    --charcoal:#1c1c1e; --amber:#f5a623; --cream:#fdf6e9; --green:#2f6b3c;
-    --header-grad-top:#161616; --muted:#c9c2b3; --panel-bg:rgba(28,28,30,.92);
-    --panel-border:#444; --placeholder:#aaa;
-    /* Popup card colors — deliberately its own deep slate/navy in dark mode, not just
-       the app's plain charcoal, so it reads as a distinct "card" floating over the map */
-    --popup-bg:#1e2d3a; --popup-text:#eef2f5; --popup-muted:#9fb0bb; --popup-border:#33454f;
-    --popup-divider:#33454f; --popup-report-bg:#3a2226; --popup-tip-input-bg:#16232c;
-    --popup-star-empty:#425c6b;
+    --charcoal:#0b192a; --accent:#38b8bb; --amber:var(--accent); --cream:#f5f7fa; --green:#2f6b3c;
+    --header-grad-top:#0d1f33; --muted:#93a5b8; --panel-bg:rgba(11,25,42,.92);
+    --panel-border:#2a4056; --placeholder:#7d90a3;
+    /* Popup card colors — its own deep navy in dark mode, distinct from the app's main
+       background, so it reads as a floating "card" rather than blending in */
+    --popup-bg:#0f2235; --popup-text:#f5f7fa; --popup-muted:#93a5b8; --popup-border:#2a4056;
+    --popup-divider:#2a4056; --popup-report-bg:#3a2226; --popup-tip-input-bg:#0a1826;
+    --popup-star-empty:#3a5165;
   }
   html[data-theme="light"]{
-    --charcoal:#f3efe3; --cream:#1c1c1e; --header-grad-top:#ffffff;
-    --muted:#555; --panel-bg:rgba(255,255,255,.92); --panel-border:#ccc; --placeholder:#888;
-    --popup-bg:#fffaf0; --popup-text:#1c1c1e; --popup-muted:#666; --popup-border:#eee;
-    --popup-divider:#eee; --popup-report-bg:#fdecea; --popup-tip-input-bg:#ffffff;
-    --popup-star-empty:#ddd;
+    --charcoal:#eef3f5; --cream:#0b192a; --header-grad-top:#ffffff;
+    --muted:#5a6b7a; --panel-bg:rgba(255,255,255,.92); --panel-border:#cfd8de; --placeholder:#8a97a3;
+    --popup-bg:#ffffff; --popup-text:#0b192a; --popup-muted:#5a6b7a; --popup-border:#dfe6ea;
+    --popup-divider:#dfe6ea; --popup-report-bg:#fdecea; --popup-tip-input-bg:#ffffff;
+    --popup-star-empty:#d5dde1;
   }
   *{box-sizing:border-box;}
   html, body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--charcoal);color:var(--cream);}
@@ -25,15 +25,17 @@
     box-shadow:0 2px 12px rgba(0,0,0,.25);
     position:relative;z-index:1;
   }
+  #headerTopRow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  #headerBrand{display:flex;align-items:center;gap:10px;min-width:0;}
+  #headerActions{display:flex;gap:6px;flex:none;flex-wrap:wrap;align-items:center;justify-content:flex-end;}
   #headerIcon{
     flex:none;width:38px;height:38px;border-radius:11px;
-    background:linear-gradient(135deg,var(--amber),#c9791a);
-    display:flex;align-items:center;justify-content:center;font-size:20px;
     box-shadow:0 2px 6px rgba(0,0,0,.3);
+    object-fit:cover;
   }
-  #header h1{margin:0;font-size:17px;font-weight:800;letter-spacing:.2px;line-height:1.2;}
+  #header h1{margin:0;font-size:19px;font-weight:800;letter-spacing:.2px;line-height:1.2;white-space:nowrap;}
   #headerSubtitle{
-    margin:2px 0 0;font-size:12.5px;color:var(--muted);line-height:1.35;
+    margin:8px 0 0;font-size:12.5px;color:var(--muted);line-height:1.35;
   }
   #infoBtn{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;vertical-align:middle;padding:0 0 0 4px;}
   #themeToggle{
@@ -46,8 +48,8 @@
     white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;
   }
   #chainBadge{
-    display:inline-block;margin-top:5px;font-size:10.5px;font-weight:700;color:var(--amber);
-    background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.35);
+    display:inline-block;margin-top:6px;font-size:10.5px;font-weight:700;color:var(--accent);
+    background:rgba(56,184,187,.14);border:1px solid rgba(56,184,187,.4);
     padding:3px 8px;border-radius:12px;
   }
   #cashAppBtn{
@@ -305,18 +307,15 @@
 .feature-badge{font-size:11px;padding:3px 6px;border-radius:10px;background:rgba(47,107,60,.18);border:1px solid rgba(76,175,80,.45);color:var(--popup-text);}
 .feature-badge.unconfirmed{background:transparent;border-color:var(--popup-divider);color:var(--popup-muted);}
 .amenities-editor{margin:8px 0;padding:8px;border:1px solid var(--popup-divider);border-radius:7px;}
-.amenity-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;}
-.amenity-chip{
-  font-size:12px;padding:7px 10px;border-radius:20px;cursor:pointer;
-  background:var(--popup-tip-input-bg);color:var(--popup-muted);border:1px solid var(--popup-border);
-  transition:background .15s ease,color .15s ease,border-color .15s ease;
+.amenity-progress{font-size:11px;color:var(--popup-muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;}
+.amenity-question-label{font-size:14px;font-weight:700;color:var(--popup-text);margin-bottom:8px;}
+.amenity-answer-row{display:flex;flex-wrap:wrap;gap:6px;}
+.amenity-answer-btn{
+  font-size:12.5px;padding:8px 12px;border-radius:20px;cursor:pointer;
+  background:var(--popup-tip-input-bg);color:var(--popup-text);border:1px solid var(--popup-border);
 }
-.amenity-chip-state{font-weight:700;}
-.amenity-chip-unknown{opacity:.75;}
-.amenity-chip-yes{background:rgba(47,107,60,.22);border-color:rgba(76,175,80,.55);color:var(--popup-text);}
-.amenity-chip-yes .amenity-chip-state{color:#66bb6a;}
-.amenity-chip-no{background:rgba(198,40,40,.15);border-color:rgba(229,115,115,.5);color:var(--popup-text);}
-.amenity-chip-no .amenity-chip-state{color:#ef9a9a;}
+.amenity-answer-btn:disabled{opacity:.5;cursor:default;}
+.amenity-complete{font-size:13.5px;color:var(--accent);font-weight:700;padding:4px 0;}
 .condition-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px;}
 .condition-btn{font-size:11.5px;padding:6px;border:1px solid var(--popup-border);border-radius:6px;background:var(--popup-tip-input-bg);color:var(--popup-text);cursor:pointer;}
 .condition-btn:disabled{opacity:.6;cursor:default;}
