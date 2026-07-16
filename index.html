@@ -25,6 +25,7 @@
 <script type="module" src="firebase.js"></script>
 <script src="stewarts-locations.js"></script>
 <script src="cumberland-farms-locations.js"></script>
+<script src="wawa-locations.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
@@ -223,8 +224,7 @@
   </div>
 </div>
 
-<script src="stewarts-locations.js"></script>
-<!-- To add a chain: <script src="<chain>-locations.js"></script> here, then register it in app.js's CHAIN_REGISTRY -->
+<!-- Chain data files load in <head> above, alongside stewarts-locations.js and cumberland-farms-locations.js; add a new chain's <script> tag there, then register it in app.js's CHAIN_REGISTRY -->
 <script src="app.js"></script>
 </body>
 </html>
