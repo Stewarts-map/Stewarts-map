@@ -14,7 +14,8 @@
 const CHAIN_REGISTRY = {
   stewarts: { name: "Stewart's Shops", color: '#a51e36', textColor: '#ffffff', dataVar: 'stewartsLocations' },
   cumberlandFarms: { name: "Cumberland Farms", color: '#009639', textColor: '#ffffff', dataVar: 'cumberlandFarmsLocations' },
-  wawa: { name: "Wawa", color: '#c8102e', textColor: '#ffffff', dataVar: 'wawaLocations' }
+  wawa: { name: "Wawa", color: '#c8102e', textColor: '#ffffff', dataVar: 'wawaLocations' },
+  fastrac: { name: "Fastrac", color: '#d5a00f', textColor: '#1a1200', dataVar: 'fastracLocations' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
