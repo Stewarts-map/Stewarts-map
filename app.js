@@ -120,6 +120,12 @@ function positionSelectedMarker(marker, animate = false){
 function zoomToMarker(marker){
   if(!marker) return;
 
+  // The marker's chain may currently be hidden by the Chains filter (e.g. Bathroom Now
+  // or a search result pointing at a location outside the selected chains). Force it
+  // visible for this one lookup rather than silently failing to open — the normal filter
+  // reasserts itself next time applyFilters() runs (e.g. any checkbox change).
+  if(!markerCluster.hasLayer(marker)) markerCluster.addLayer(marker);
+
   map.setView(marker.getLatLng(), 16, { animate: false });
   positionSelectedMarker(marker, false);
   marker.openPopup();
@@ -147,6 +153,7 @@ map.on('popupopen', () => {
   document.getElementById('missingBtn').style.display = 'none';
   document.getElementById('missingPanel').classList.remove('show');
   document.getElementById('legendBody').classList.add('collapsed');
+  document.getElementById('chainFilterBody')?.classList.add('collapsed');
   document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
   document.getElementById('leaderboardToggle').style.display = 'none';
@@ -159,6 +166,8 @@ map.on('popupclose', () => {
   document.getElementById('leaderboardToggle').style.display = '';
   const wasCollapsed = localStorage.getItem('legendCollapsed') === '1';
   if(!wasCollapsed) document.getElementById('legendBody').classList.remove('collapsed');
+  const chainWasCollapsed = localStorage.getItem('chainFilterCollapsed') === '1';
+  if(!chainWasCollapsed) document.getElementById('chainFilterBody')?.classList.remove('collapsed');
 });
 
 // Two tile sources now: satellite imagery for light mode, street map (with a CSS invert
@@ -2272,13 +2281,14 @@ function bathroomNowCard(result,fallback=false){
   const hoursMissingNote=open===null?'<br><small>No hours listed for this store — tap "View pin" then 🚩 to send them in.</small>':'';
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);
   const chainNote=outsideSelection?`<br><small>Nothing close by in your selected chains, so this ${escapeHtml((CHAIN_REGISTRY[result.loc.chain]||{}).name||'nearby')} location is shown instead.</small>`:'';
-  return `<div class="bathroom-now-card"><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div><b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${fallback?'<br><small>Driving route unavailable; using straight-line distance.</small>':''}${hoursMissingNote}${chainNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="btn-icon-only bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div><b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${fallback?'<br><small>Driving route unavailable; using straight-line distance.</small>':''}${hoursMissingNote}${chainNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
 }
 let userMarker=null;
 const locateBtn=document.getElementById('locateBtn'),nearestInfo=document.getElementById('nearestInfo');
 let suppressNextLocateClick=false;
 function showBathroomNowResult(result,fallback=false){
   nearestInfo.style.display='block'; nearestInfo.innerHTML=bathroomNowCard(result,fallback);
+  document.getElementById('bathroom-now-close').onclick=()=>{ nearestInfo.style.display='none'; };
   document.getElementById('bathroom-now-view').onclick=()=>zoomToMarker(markers[result.loc.id]);
   document.getElementById('bathroom-now-directions').onclick=()=>{const pref=localStorage.getItem('preferredNavApp')||'google';window.open(buildNavUrl(pref,result.loc.lat,result.loc.lng),'_blank','noopener');};
   zoomToMarker(markers[result.loc.id]);
