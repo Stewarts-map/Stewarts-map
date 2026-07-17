@@ -476,9 +476,11 @@
 .bathroom-now-card .now-title{font-weight:800;color:var(--amber);margin-bottom:3px;}
 .bathroom-now-card .now-actions{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
 .bathroom-now-close{
-  position:absolute;top:0;right:0;background:none;border:none;color:var(--muted);
-  font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;
+  position:absolute;top:-4px;right:-4px;background:rgba(255,255,255,.12);border:none;
+  color:var(--cream);font-size:15px;font-weight:700;cursor:pointer;line-height:1;
+  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
 }
+.bathroom-now-close:active{background:rgba(255,255,255,.25);}
 @media(max-width:480px){#nearestInfo{left:10px;right:10px;max-width:none;top:160px}}
 
 

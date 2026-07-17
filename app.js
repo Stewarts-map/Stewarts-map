@@ -152,8 +152,7 @@ map.on('popupopen', () => {
   document.getElementById('nearestInfo').style.display = 'none';
   document.getElementById('missingBtn').style.display = 'none';
   document.getElementById('missingPanel').classList.remove('show');
-  document.getElementById('legendBody').classList.add('collapsed');
-  document.getElementById('chainFilterBody')?.classList.add('collapsed');
+  document.getElementById('topLeftControls').style.display = 'none';
   document.getElementById('openNowToggle').style.display = 'none';
   document.getElementById('listViewToggle').style.display = 'none';
   document.getElementById('leaderboardToggle').style.display = 'none';
@@ -161,13 +160,10 @@ map.on('popupopen', () => {
 map.on('popupclose', () => {
   document.getElementById('locateBtn').style.display = '';
   document.getElementById('missingBtn').style.display = '';
+  document.getElementById('topLeftControls').style.display = '';
   document.getElementById('openNowToggle').style.display = '';
   document.getElementById('listViewToggle').style.display = '';
   document.getElementById('leaderboardToggle').style.display = '';
-  const wasCollapsed = localStorage.getItem('legendCollapsed') === '1';
-  if(!wasCollapsed) document.getElementById('legendBody').classList.remove('collapsed');
-  const chainWasCollapsed = localStorage.getItem('chainFilterCollapsed') === '1';
-  if(!chainWasCollapsed) document.getElementById('chainFilterBody')?.classList.remove('collapsed');
 });
 
 // Two tile sources now: satellite imagery for light mode, street map (with a CSS invert
@@ -2281,7 +2277,7 @@ function bathroomNowCard(result,fallback=false){
   const hoursMissingNote=open===null?'<br><small>No hours listed for this store — tap "View pin" then 🚩 to send them in.</small>':'';
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);
   const chainNote=outsideSelection?`<br><small>Nothing close by in your selected chains, so this ${escapeHtml((CHAIN_REGISTRY[result.loc.chain]||{}).name||'nearby')} location is shown instead.</small>`:'';
-  return `<div class="bathroom-now-card"><button class="btn-icon-only bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div><b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${fallback?'<br><small>Driving route unavailable; using straight-line distance.</small>':''}${hoursMissingNote}${chainNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
+  return `<div class="bathroom-now-card"><button class="bathroom-now-close" id="bathroom-now-close" title="Close">✕</button><div class="now-title">🚽 ${fallback?'Closest location':'Closest bathroom by driving distance'}</div><b>${result.loc.n}</b><br>${distance}${duration}<br>${open===true?'🟢 Open now':open===false?'🔴 Closed now':'⚪ Hours unavailable'}<br>🚻 ${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}${fallback?'<br><small>Driving route unavailable; using straight-line distance.</small>':''}${hoursMissingNote}${chainNote}<div class="now-actions"><button class="btn btn-primary" id="bathroom-now-directions">🧭 Get Directions</button><button class="btn btn-secondary" id="bathroom-now-view">View pin</button></div></div>`;
 }
 let userMarker=null;
 const locateBtn=document.getElementById('locateBtn'),nearestInfo=document.getElementById('nearestInfo');
