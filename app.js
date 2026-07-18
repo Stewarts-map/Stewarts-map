@@ -17,8 +17,8 @@ const CHAIN_REGISTRY = {
   wawa: { name: "Wawa", color: '#c8102e', textColor: '#ffffff', dataVar: 'wawaLocations' },
   fastrac: { name: "Fastrac", color: '#e1251b', textColor: '#ffffff', dataVar: 'fastracLocations' },
   alltownFresh: { name: "Alltown Fresh", color: '#4f6f3d', textColor: '#ffffff', dataVar: 'alltownFreshLocations' },
-  byrneDairy: { name: "Byrne Dairy", color: '#0067b1', textColor: '#ffffff', dataVar: 'byrneDairyLocations' },
-  parkers: { name: "Parker's", color: '#ffc72c', textColor: '#1c1c1e', dataVar: 'parkersLocations' }
+  byrneDairy: { name: "Byrne Dairy", color: '#be1e2d', textColor: '#ffffff', dataVar: 'byrneDairyLocations' },
+  parkers: { name: "Parker's", color: '#005ca9', textColor: '#ffffff', dataVar: 'parkersLocations' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 

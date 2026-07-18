@@ -153,7 +153,7 @@
   #legend, #chainFilter{
     background:var(--panel-bg);
     padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.6;border:1px solid var(--panel-border);
-    max-width:150px;
+    max-width:min(200px, calc(100vw - 172px));
   }
   #legendToggle, #chainFilterToggle{
     cursor:pointer;font-weight:700;color:var(--cream);white-space:nowrap;
@@ -165,7 +165,7 @@
   #chainFilterToggle.collapsed-toggle #chainFilterArrow{transform:rotate(-90deg);display:inline-block;}
   .chain-filter-row{
     display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;
-    color:var(--cream);white-space:nowrap;
+    color:var(--cream);white-space:nowrap;overflow:hidden;
   }
   .chain-filter-row input{margin:0;cursor:pointer;}
   /* Right-side map controls: one aligned stack with matching dimensions. */
@@ -206,7 +206,7 @@
   }
   @keyframes location-spin{to{transform:rotate(360deg);}}
 
-  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;flex-shrink:0;}
   #locateBtn{
     position:absolute;top:176px;right:10px;z-index:500;
     width:148px;min-height:42px;box-sizing:border-box;
