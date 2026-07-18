@@ -159,6 +159,9 @@ button,input{font:inherit}button{touch-action:manipulation}a{color:var(--accent)
 <script src="cumberland-farms-locations.js"></script>
 <script src="wawa-locations.js"></script>
 <script src="fastrac-locations.js"></script>
+<script src="alltownfresh-locations.js"></script>
+<script src="byrne-dairy-locations.js"></script>
+<script src="parkers-locations.js"></script>
 <script>
 // Same merge pattern as the public app's CHAIN_REGISTRY — locations.js was a stale,
 // Stewart's-only snapshot (311 entries) that never got updated when Cumberland Farms
@@ -170,7 +173,10 @@ const CHAIN_META = {
   stewarts: { name: "Stewart's Shops", color: '#a51e36', dataVar: 'stewartsLocations' },
   cumberlandFarms: { name: 'Cumberland Farms', color: '#009639', dataVar: 'cumberlandFarmsLocations' },
   wawa: { name: 'Wawa', color: '#c8102e', dataVar: 'wawaLocations' },
-  fastrac: { name: 'Fastrac', color: '#d5a00f', dataVar: 'fastracLocations' }
+  fastrac: { name: 'Fastrac', color: '#d5a00f', dataVar: 'fastracLocations' },
+  alltownFresh: { name: 'Alltown Fresh', color: '#4f6f3d', dataVar: 'alltownFreshLocations' },
+  byrneDairy: { name: 'Byrne Dairy', color: '#0067b1', dataVar: 'byrneDairyLocations' },
+  parkers: { name: "Parker's", color: '#ffc72c', dataVar: 'parkersLocations' }
 };
 let seedLocations = [];
 Object.keys(CHAIN_META).forEach(key => {
