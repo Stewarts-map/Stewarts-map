@@ -182,30 +182,25 @@
 #appDrawer .d-brand b{ font-size:16px; font-weight:900; letter-spacing:.02em; color:var(--shell-ink); font-family:var(--font-display); }
 #appDrawer .d-brand b .wm-accent{ color:var(--accent); }
 #appDrawer .d-items{ display:flex; flex-direction:column; padding:8px 0; flex:1; }
-/* the relocated controls render as full-width menu rows */
-#appDrawer #passportToggle,
-#appDrawer #infoBtn{
-  position:static !important; width:100% !important; text-align:left !important;
-  background:transparent !important; border:0 !important; box-shadow:none !important;
-  color:var(--shell-ink) !important; font-size:15px !important; font-weight:700 !important;
-  padding:15px 20px !important; border-radius:0 !important;
-}
-#appDrawer #passportToggle:active,
-#appDrawer #infoBtn:active{ background:var(--shell-chrome2) !important; }
-#appDrawer #showAllToggle.d-toggle{
+/* All drawer rows share one left-aligned layout so icons + labels line up */
+#appDrawer .d-items button{
   position:static !important; width:100% !important; display:flex !important; align-items:center;
-  gap:12px; background:transparent !important; border:0 !important; box-shadow:none !important;
+  gap:10px; background:transparent !important; border:0 !important; box-shadow:none !important;
   color:var(--shell-ink) !important; font-size:15px !important; font-weight:700 !important;
   padding:15px 20px !important; border-radius:0 !important; text-align:left !important;
 }
-#appDrawer #showAllToggle .d-switch{
+#appDrawer .d-items button:active{ background:var(--shell-chrome2) !important; }
+/* Toggle rows (Show all locations, Appearance): switch pinned to the right */
+#appDrawer .d-toggle .d-switch{
   margin-left:auto; width:42px; height:25px; border-radius:999px; background:var(--shell-chrome2);
   border:1px solid var(--shell-line); position:relative; flex:none;
 }
-#appDrawer #showAllToggle .d-switch b{ position:absolute; top:2px; left:2px; width:19px; height:19px;
+#appDrawer .d-toggle .d-switch b{ position:absolute; top:2px; left:2px; width:19px; height:19px;
   border-radius:50%; background:var(--shell-muted); transition:.16s; }
-#appDrawer #showAllToggle.on .d-switch{ background:color-mix(in srgb, var(--accent) 30%, transparent); }
-#appDrawer #showAllToggle.on .d-switch b{ left:19px; background:var(--accent); }
+#appDrawer .d-toggle.on .d-switch{ background:color-mix(in srgb, var(--accent) 30%, transparent); }
+#appDrawer .d-toggle.on .d-switch b{ left:19px; background:var(--accent); }
+/* State caption under a toggle label */
+#appDrawer .d-sub{ display:block; font-size:12px; font-weight:500; color:var(--shell-muted); margin-top:3px; }
 #appDrawer .d-foot{ padding:14px 20px 0; border-top:1px solid var(--shell-line); color:var(--shell-muted); font-size:11px; }
 
 @media (prefers-reduced-motion: reduce){
@@ -293,17 +288,8 @@ body.list-open #communityBanner { display:none !important; }
 
 
 /* ---------- Theme toggle relocated into the drawer (signed-in only) ---------- */
-#appDrawer #themeToggle{
-  position:static !important; width:100% !important; height:auto !important;
-  display:flex !important; align-items:center !important; justify-content:space-between !important;
-  background:transparent !important; border:0 !important; box-shadow:none !important;
-  color:var(--shell-ink) !important; font-size:15px !important; font-weight:700 !important;
-  padding:15px 20px !important; border-radius:0 !important; text-align:left !important;
-}
-#appDrawer #themeToggle::before{ content:"Appearance"; }
-/* Light/dark is a signed-in feature — hide the whole row (emoji + label) when logged out. */
+/* Light/dark is a signed-in feature — hide the whole Appearance row when logged out. */
 body:not(.logged-in) #appDrawer #themeToggle{ display:none !important; }
-#appDrawer #themeToggle:active{ background:var(--shell-chrome2) !important; }
 
 
 /* ---------- X + Cash App icon row in the FAQ / How-it-works page ---------- */

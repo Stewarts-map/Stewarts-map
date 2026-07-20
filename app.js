@@ -45,7 +45,11 @@ seedLocations.forEach(loc => { locationsById[loc.id] = loc; });
 function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
   const btn = document.getElementById('themeToggle');
-  if(btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+  if(btn){
+    const ic = btn.querySelector('.theme-ico');
+    if(ic) ic.textContent = theme === 'light' ? '☀️' : '🌙';
+    btn.classList.toggle('on', theme === 'light');
+  }
   if(typeof setMapTilesForTheme === 'function') setMapTilesForTheme(theme);
 }
 document.getElementById('themeToggle').addEventListener('click', () => {
@@ -1963,6 +1967,8 @@ applyFilters();
   t.addEventListener('click', () => {
     showAllLocations = !showAllLocations;
     t.classList.toggle('on', showAllLocations);
+    const sub = document.getElementById('showAllSub');
+    if(sub) sub.textContent = showAllLocations ? 'Showing all locations' : 'Hiding closed locations';
     applyFilters();
   });
 })();
