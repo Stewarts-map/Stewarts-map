@@ -1360,7 +1360,7 @@ const ACHIEVEMENT_DEFS = [
     calc: (s) => ({ done: s.hasNightOwlCheckin, current: s.hasNightOwlCheckin ? 1 : 0, total:1 }) },
   { key:'countyCollector', icon:'🗺️', name:'County Collector', desc:'Visit locations in 10 different areas',
     calc: (s) => ({ done: s.areaCount >= 10, current: Math.min(s.areaCount,10), total:10 }) },
-  { key:'stewartsLegend', icon:'🏁', name:"Stewart's Legend", desc:'Visit every location currently on the map',
+  { key:'stewartsLegend', icon:'🏁', name:"Rest Stop Legend", desc:'Visit every location currently on the map',
     calc: (s) => ({ done: s.totalLocations > 0 && s.visitedCount >= s.totalLocations, current: s.visitedCount, total: s.totalLocations }) }
 ];
 
@@ -1500,7 +1500,7 @@ function renderBathroomPassport(stats, results){
   const unlockedCount = Object.values(results).filter(r => r.unlocked).length;
 
   container.innerHTML = `
-    <div class="passport-stat-line">${stats.visitedCount} / ${stats.totalLocations} Stewart's visited — ${pct}% complete</div>
+    <div class="passport-stat-line">${stats.visitedCount} / ${stats.totalLocations} Shops visited — ${pct}% complete</div>
     <div class="passport-progress-bar"><div class="passport-progress-fill" style="width:${Math.min(100,pct)}%;"></div></div>
     <div class="passport-mini-stats">
       <div>🚻 ${stats.bathroomRatedCount} bathrooms reviewed</div>
