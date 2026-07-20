@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bathroomreport-v23';
+const CACHE_NAME = 'bathroomreport-v28';
 const APP_SHELL = [
   './',
   './index.html',
@@ -45,25 +45,42 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if(url.origin !== self.location.origin) return;
 
-  // Stale-while-revalidate: serve the cached copy immediately when we have one (so
-  // repeat visits don't re-download ~1 MB of chain data every load), and refresh that
-  // copy from the network in the background so the *next* load is up to date. On a cache
-  // miss we go to the network and cache the result; if the network is unreachable we fall
-  // back to index.html so navigations still work offline. The cache is versioned
-  // (CACHE_NAME), so bump the version on any deploy to force fresh files through.
+  const path = url.pathname;
+
+  // CODE + SHELL → network-first. The app's own code (app.js, the stylesheets, firebase.js)
+  // and every navigation always try the network first, so a new deploy takes effect on the
+  // very next load instead of waiting for a cache cycle. Falls back to cache when offline.
+  // This is what prevents stale old code (e.g. a removed bulk read) from lingering.
+  const isCodeShell = event.request.mode === 'navigate'
+    || path === '/'
+    || /\/(index\.html|app\.js|shell\.css|styles\.css|firebase\.js)$/.test(path);
+
+  if(isCodeShell){
+    event.respondWith(
+      caches.open(CACHE_NAME).then(cache =>
+        fetch(event.request)
+          .then(response => {
+            if(response && response.status === 200) cache.put(event.request, response.clone());
+            return response;
+          })
+          .catch(() => cache.match(event.request).then(c => c || cache.match('./index.html')))
+      )
+    );
+    return;
+  }
+
+  // EVERYTHING ELSE (big chain-data JS, images, manifest) → stale-while-revalidate: serve the
+  // cached copy instantly so repeat visits don't re-download ~1 MB of data, and refresh it in
+  // the background for next time.
   event.respondWith(
     caches.open(CACHE_NAME).then(cache =>
       cache.match(event.request).then(cached => {
         const networkFetch = fetch(event.request)
           .then(response => {
-            if(response && response.status === 200){
-              cache.put(event.request, response.clone());
-            }
+            if(response && response.status === 200) cache.put(event.request, response.clone());
             return response;
           })
           .catch(() => cached || caches.match('./index.html'));
-        // Cached hit → instant response now, revalidation continues in the background.
-        // Cached miss → wait for the network (with the offline fallback above).
         return cached || networkFetch;
       })
     )

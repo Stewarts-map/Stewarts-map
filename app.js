@@ -2050,7 +2050,7 @@ let currentListPosition = null;
 const NEAREST_COUNT = 10; // List shows only the closest few — a quick launcher into the map
 async function buildListView(){
   const container = document.getElementById('listViewItems');
-  container.innerHTML = '<div style="padding:16px;color:#999;">Loading…</div>';
+  container.innerHTML = '<div style="padding:16px;color:#999;">Finding your location…</div>';
 
   // Nearest-first, so it needs the user's location. Reuse a recent fix, else request one.
   if(!currentListPosition){
@@ -2061,6 +2061,7 @@ async function buildListView(){
     container.innerHTML = '<div style="padding:22px 18px;color:#c7d5e2;text-align:center;line-height:1.5;">📍 Turn on location to see the bathrooms closest to you.</div>';
     return;
   }
+  setUserLocationMarker(currentListPosition.lat, currentListPosition.lng);
 
   // Distance-only + capped: no ratings, no reads to build. Details load when a pin is opened.
   const nearest = seedLocations
@@ -2075,8 +2076,8 @@ async function buildListView(){
     return `<div class="list-item" data-locid="${loc.id}"><div class="list-item-name">${loc.n}</div><div class="list-item-addr">${loc.addr}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
   }).join('');
 }
-document.getElementById('listViewToggle').addEventListener('click',()=>{buildListView();document.getElementById('listViewPanel').classList.add('show');});
-document.getElementById('listViewClose').addEventListener('click',()=>{document.getElementById('listViewPanel').classList.remove('show');suppressNextLocateClick=true;setTimeout(()=>{suppressNextLocateClick=false;},400);});
+document.getElementById('listViewToggle').addEventListener('click',()=>{buildListView();document.getElementById('listViewPanel').classList.add('show');document.body.classList.add('list-open');});
+document.getElementById('listViewClose').addEventListener('click',()=>{document.getElementById('listViewPanel').classList.remove('show');document.body.classList.remove('list-open');suppressNextLocateClick=true;setTimeout(()=>{suppressNextLocateClick=false;},400);});
 
 // Account panel
 function updateAccountUI(){
@@ -2184,6 +2185,7 @@ document.getElementById('listViewItems').addEventListener('click', (e) => {
   // sits underneath at the same screen coordinates (e.g. the Where am I? button).
   setTimeout(() => {
     document.getElementById('listViewPanel').classList.remove('show');
+    document.body.classList.remove('list-open');
     suppressNextLocateClick = true;
     setTimeout(() => { suppressNextLocateClick = false; }, 400);
     if(marker) zoomToMarker(marker);
@@ -2261,59 +2263,42 @@ function showBathroomNowResult(result,fallback=false){
   document.getElementById('bathroom-now-directions').onclick=()=>{const pref=localStorage.getItem('preferredNavApp')||'google';window.open(buildNavUrl(pref,result.loc.lat,result.loc.lng),'_blank','noopener');};
   zoomToMarker(markers[result.loc.id]);
 }
-// Bathroom Now: one tap -> nearest OPEN bathroom -> directions in the user's preferred app.
-// Ranked by straight-line distance (the maps app computes the real route), so the whole
-// thing can run without waiting on a routing API — which matters because opening a URL after
-// an async gap gets popup-blocked on mobile. When we already have a recent fix we open
-// directions synchronously inside the tap; otherwise we reserve a tab inside the tap and
-// point it at directions once the location fix returns.
 locateBtn.addEventListener('click',()=>{
   if(suppressNextLocateClick)return;
   if(!navigator.geolocation){nearestInfo.style.display='block';nearestInfo.textContent="Your browser doesn't support location.";return;}
-
-  const navUrlFor = loc => buildNavUrl(localStorage.getItem('preferredNavApp')||'google', loc.lat, loc.lng);
-  const nearestOpen = user => {
-    const CHAIN_FALLBACK_MILES = 20;
-    let eligible = seedLocations.filter(loc => activeChains.has(loc.chain||DEFAULT_CHAIN_KEY) && isLocationOpenNow(loc)!==false);
-    const nearestSel = eligible.reduce((min,loc)=>{const d=milesBetween(user.lat,user.lng,loc.lat,loc.lng);return d<min?d:min;},Infinity);
-    if(nearestSel > CHAIN_FALLBACK_MILES) eligible = seedLocations.filter(loc => isLocationOpenNow(loc)!==false);
-    if(!eligible.length) return null;
-    return eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d)[0].loc;
-  };
-  const centerOn = loc => { const m=markers[loc.id]; if(m) zoomToMarker(m); else map.setView([loc.lat,loc.lng],16); };
-  const noneMsg = () => { nearestInfo.style.display='block'; nearestInfo.textContent='No open bathrooms found nearby right now.'; };
-
-  // Fast path — recent fix: compute + open directions synchronously (stays inside the gesture).
-  const fresh = (lastKnownPos && Date.now()-lastKnownPos.ts < 5*60*1000) ? lastKnownPos : null;
-  if(fresh){
-    const loc = nearestOpen(fresh);
-    if(!loc){ noneMsg(); return; }
-    centerOn(loc);
-    window.open(navUrlFor(loc),'_blank','noopener');
-    return;
-  }
-
-  // Slow path — need a fix: reserve a tab now, redirect it after the async location returns.
-  const pending = window.open('','_blank');
-  locateBtn.disabled=true; locateBtn.textContent='🚽 Finding bathroom…'; nearestInfo.style.display='none';
-  navigator.geolocation.getCurrentPosition(pos=>{
-    const user={lat:pos.coords.latitude,lng:pos.coords.longitude};
-    lastKnownPos={...user,ts:Date.now()}; currentListPosition=lastKnownPos;
+  locateBtn.disabled=true;locateBtn.textContent='🚽 Finding bathroom…';nearestInfo.style.display='none';
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const user={lat:pos.coords.latitude,lng:pos.coords.longitude};lastKnownPos={...user,ts:Date.now()};currentListPosition=lastKnownPos;
     setUserLocationMarker(user.lat,user.lng);
-    locateBtn.disabled=false; locateBtn.textContent='🚽 Bathroom Now';
-    const loc = nearestOpen(user);
-    if(!loc){ if(pending) pending.close(); noneMsg(); return; }
-    centerOn(loc);
-    const url = navUrlFor(loc);
-    if(pending) pending.location.href = url; else window.location.href = url;
-  }, err=>{
-    if(pending) pending.close();
-    locateBtn.disabled=false; locateBtn.textContent='🚽 Bathroom Now';
-    nearestInfo.style.display='block';
-    nearestInfo.textContent = err.code===1
-      ? 'Location access was denied. Enable location permission for this site to use Bathroom Now.'
-      : 'Could not get your location. Check your connection and location settings.';
-  }, {enableHighAccuracy:true, timeout:10000});
+    // Prefer the selected chains, but don't strand someone far from their nearest pick —
+    // if nothing selected is within a reasonable driving distance, widen to every chain
+    // (still open-only) so the closest real option wins instead.
+    const CHAIN_FALLBACK_MILES = 20;
+    let eligible = seedLocations.filter(loc =>
+      activeChains.has(loc.chain || DEFAULT_CHAIN_KEY) && isLocationOpenNow(loc) !== false
+    );
+    const nearestSelectedMiles = eligible.reduce((min,loc) => {
+      const d = milesBetween(user.lat, user.lng, loc.lat, loc.lng);
+      return d < min ? d : min;
+    }, Infinity);
+    if(nearestSelectedMiles > CHAIN_FALLBACK_MILES){
+      eligible = seedLocations.filter(loc => isLocationOpenNow(loc) !== false);
+    }
+    const candidates=eligible.map(loc=>({loc,d:milesBetween(user.lat,user.lng,loc.lat,loc.lng)})).sort((a,b)=>a.d-b.d).slice(0,10).map(x=>x.loc);
+    if(!candidates.length){
+      locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';
+      nearestInfo.style.display='block';
+      nearestInfo.textContent='No open bathrooms found nearby right now.';
+      return;
+    }
+    try{
+      const options=await getDrivingOptions(user,candidates);
+      options.sort((a,b)=>{const rank=x=>isLocationOpenNow(x.loc)===true?0:isLocationOpenNow(x.loc)===null?1:2;return rank(a)-rank(b)||a.distanceMiles-b.distanceMiles;});
+      if(!options.length)throw new Error('No routes');showBathroomNowResult(options[0],false);
+    }catch(e){
+      const loc=candidates[0];showBathroomNowResult({loc,distanceMiles:milesBetween(user.lat,user.lng,loc.lat,loc.lng),durationMinutes:null},true);
+    }finally{locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';}
+  },err=>{locateBtn.disabled=false;locateBtn.textContent='🚽 Bathroom Now';nearestInfo.style.display='block';nearestInfo.textContent=err.code===1?'Location access was denied. Enable location permission for this site to use Bathroom Now.':'Could not get your location. Check your connection and location settings.';},{enableHighAccuracy:true,timeout:10000});
 });
 
 // Missing-location reporting — logs straight to Firestore (visible in FlushPanel), no email needed
