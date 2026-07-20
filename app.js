@@ -1765,9 +1765,7 @@ document.getElementById('onboardingClose').addEventListener('click', () => {
   localStorage.setItem('onboardingSeen', '1');
   document.getElementById('onboardingOverlay').classList.remove('show');
 });
-document.getElementById('infoBtn').addEventListener('click', () => {
-  document.getElementById('onboardingOverlay').classList.add('show');
-});
+// ("How it works" opens the info page — wired in index.html's chrome script)
 
 // If this page was opened via a shared link (?loc=xyz), jump straight to that pin
 (function(){
@@ -2039,89 +2037,36 @@ applyFilters();
 
 // List view — sortable without adding a permanent map search bar
 let currentListPosition = null;
-// Bulk lookup of confirmed-accessible locations for the List view filter — one full scan
-// of votes, cached for the rest of the session rather than re-querying every time the
-// filter's toggled.
-let accessibleLocIdsCache = null;
-async function loadAccessibleLocIds(){
-  if(accessibleLocIdsCache) return accessibleLocIdsCache;
-  try{
-    const {db, collection, getDocs} = await fb();
-    const snap = await getDocs(collection(db, 'votes'));
-    const tally = {};
-    snap.forEach(d => {
-      const v = d.data();
-      if(!v.locId || !v.amenities || !v.amenities.accessible) return;
-      if(!tally[v.locId]) tally[v.locId] = {yes:0, no:0};
-      if(v.amenities.accessible === 'yes') tally[v.locId].yes++;
-      if(v.amenities.accessible === 'no') tally[v.locId].no++;
-    });
-    const confirmedIds = new Set(
-      Object.keys(tally).filter(id => tally[id].yes >= 2 && tally[id].yes > tally[id].no)
-    );
-    accessibleLocIdsCache = confirmedIds;
-    return confirmedIds;
-  }catch(e){
-    console.error('loadAccessibleLocIds failed', e);
-    return new Set();
-  }
-}
+// (accessible-scan removed — the List is distance-only and reads nothing)
 
+const NEAREST_COUNT = 10; // List shows only the closest few — a quick launcher into the map
 async function buildListView(){
-  const container=document.getElementById('listViewItems');
-  const mode=document.getElementById('listSort').value;
-  const accessibleOnly=document.getElementById('accessibleOnly').checked;
-  container.innerHTML='<div style="padding:16px;color:#999;">Loading...</div>';
+  const container = document.getElementById('listViewItems');
+  container.innerHTML = '<div style="padding:16px;color:#999;">Loading…</div>';
 
-  // Every list mode except explicit A–Z uses distance as either the main sort
-  // or the tie-breaker after the selected criterion. Reuse a recent GPS fix first.
-  if(mode!=='az' && !currentListPosition){
-    if(lastKnownPos && (Date.now()-lastKnownPos.ts)<5*60*1000) currentListPosition=lastKnownPos;
-    else currentListPosition=await getVerifiedPosition();
+  // Nearest-first, so it needs the user's location. Reuse a recent fix, else request one.
+  if(!currentListPosition){
+    if(lastKnownPos && (Date.now()-lastKnownPos.ts) < 5*60*1000) currentListPosition = lastKnownPos;
+    else currentListPosition = await getVerifiedPosition();
+  }
+  if(!currentListPosition){
+    container.innerHTML = '<div style="padding:22px 18px;color:#c7d5e2;text-align:center;line-height:1.5;">📍 Turn on location to see the bathrooms closest to you.</div>';
+    return;
   }
 
-  let rows=seedLocations.map(loc=>({
-    loc,
-    dist:currentListPosition?milesBetween(currentListPosition.lat,currentListPosition.lng,loc.lat,loc.lng):null,
-    agg:ratingsCache[loc.id]||emptyAgg()
-  }));
+  // Distance-only + capped: no ratings, no reads to build. Details load when a pin is opened.
+  const nearest = seedLocations
+    .map(loc => ({ loc, dist: milesBetween(currentListPosition.lat, currentListPosition.lng, loc.lat, loc.lng) }))
+    .sort((a,b) => a.dist - b.dist)
+    .slice(0, NEAREST_COUNT);
 
-  if(accessibleOnly){
-    const accessibleIds = await loadAccessibleLocIds();
-    rows = rows.filter(row => accessibleIds.has(row.loc.id));
-  }
-
-  const avg=r=>r.agg.bathroomCount?r.agg.bathroomSum/r.agg.bathroomCount:0;
-  const byDistanceThenName=(a,b)=>(a.dist??Infinity)-(b.dist??Infinity)||a.loc.n.localeCompare(b.loc.n);
-  const byName=(a,b)=>a.loc.n.localeCompare(b.loc.n);
-
-  if(mode==='closest') rows.sort(currentListPosition?byDistanceThenName:byName);
-  else if(mode==='best') rows.sort((a,b)=>{
-    const aRated=a.agg.bathroomCount>0,bRated=b.agg.bathroomCount>0;
-    if(aRated!==bRated) return bRated-aRated;
-    return avg(b)-avg(a)||(currentListPosition?byDistanceThenName(a,b):byName(a,b));
-  });
-  else if(mode==='reviewed') rows.sort((a,b)=>b.agg.bathroomCount-a.agg.bathroomCount||(currentListPosition?byDistanceThenName(a,b):byName(a,b)));
-  else if(mode==='recent') rows.sort((a,b)=>{
-    const aRecent=a.agg.lastUpdated||0,bRecent=b.agg.lastUpdated||0;
-    if(aRecent!==bRecent) return bRecent-aRecent;
-    return currentListPosition?byDistanceThenName(a,b):byName(a,b);
-  });
-  else if(mode==='open'){
-    rows=rows.filter(row=>isLocationOpenNow(row.loc)===true);
-    rows.sort(currentListPosition?byDistanceThenName:byName);
-  }
-  else rows.sort(byName);
-  const labels={closest:'Closest',best:'Best bathrooms',reviewed:'Most reviewed',recent:'Recently reviewed',open:'Open now',az:'A–Z'};
-  document.getElementById('listViewHeader').querySelector('span').textContent='All Locations — '+labels[mode];
-  container.innerHTML=rows.map(({loc,dist,agg})=>{
-    const open=isLocationOpenNow(loc);
-    const avgText=agg.bathroomCount?`${avgStr(agg.bathroomSum,agg.bathroomCount)}★ · ${agg.bathroomCount} rating${agg.bathroomCount===1?'':'s'}`:'Not yet rated';
-    return `<div class="list-item" data-locid="${loc.id}"><div class="list-item-name">${loc.n}</div><div class="list-item-addr">${loc.addr}</div><div class="list-item-meta"><span>🚻 ${avgText}</span>${dist!==null?`<span>📍 ${dist.toFixed(1)} mi</span>`:''}<span>${open===true?'🟢 Open':open===false?'🔴 Closed':'⚪ Hours unavailable'}</span></div></div>`;
+  document.getElementById('listViewHeader').querySelector('span').textContent = 'Closest bathrooms';
+  container.innerHTML = nearest.map(({loc,dist}) => {
+    const open = isLocationOpenNow(loc);
+    const status = open===true ? '🟢 Open' : open===false ? '🔴 Closed' : '⚪ Hours unavailable';
+    return `<div class="list-item" data-locid="${loc.id}"><div class="list-item-name">${loc.n}</div><div class="list-item-addr">${loc.addr}</div><div class="list-item-meta"><span>📍 ${dist.toFixed(1)} mi</span><span>${status}</span></div></div>`;
   }).join('');
 }
-document.getElementById('listSort').addEventListener('change',buildListView);
-document.getElementById('accessibleOnly').addEventListener('change',buildListView);
 document.getElementById('listViewToggle').addEventListener('click',()=>{buildListView();document.getElementById('listViewPanel').classList.add('show');});
 document.getElementById('listViewClose').addEventListener('click',()=>{document.getElementById('listViewPanel').classList.remove('show');suppressNextLocateClick=true;setTimeout(()=>{suppressNextLocateClick=false;},400);});
 
@@ -2130,6 +2075,8 @@ function updateAccountUI(){
   const loggedIn = isLoggedIn();
   document.getElementById('loggedOutView').style.display = loggedIn ? 'none' : 'block';
   document.getElementById('loggedInView').style.display = loggedIn ? 'block' : 'none';
+  const _cb = document.getElementById('communityBanner');
+  if(_cb) _cb.style.display = loggedIn ? 'none' : '';   // banner is logged-out only
   const accountBtn = document.getElementById('accountToggle');
   if(loggedIn){
     const email = window.__currentUser.email || '';
