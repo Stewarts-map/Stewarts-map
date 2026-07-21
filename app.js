@@ -155,9 +155,13 @@ function zoomToMarker(marker){
   // reasserts itself next time applyFilters() runs (e.g. any checkbox change).
   if(!markerCluster.hasLayer(marker)) markerCluster.addLayer(marker);
 
+  // Open the popup BEFORE moving the map. setView fires 'moveend' synchronously, which runs
+  // applyFilters(); for an off-chain pin that check would remove the marker (chain not selected)
+  // unless its popup is already open — the popupOpen guard only protects an ALREADY-open popup.
+  // Opening first means the guard is in effect before the move, so the pin survives and shows.
+  marker.openPopup();
   map.setView(marker.getLatLng(), 16, { animate: false });
   positionSelectedMarker(marker, false);
-  marker.openPopup();
 }
 
 // Register the service worker — required by Android/Chrome for "Add to Home Screen" to
@@ -1933,9 +1937,26 @@ let disabledChains = new Set();
 })();
 
 function getActiveChains(){
+  // Chain filtering is a signed-in feature. Logged-out users always see every chain
+  // (the saved disable list is ignored until they log in), so nothing is hidden by default.
+  if(!isLoggedIn()) return new Set(Object.keys(CHAIN_REGISTRY));
   return new Set(Object.keys(CHAIN_REGISTRY).filter(k => !disabledChains.has(k)));
 }
 let activeChains = getActiveChains();
+
+// Re-apply chain visibility whenever auth state changes: recompute the active set, refresh the
+// filter checkboxes, show the control only when signed in, and repaint the map. Called from
+// updateAccountUI() (which fires on every login/logout).
+function syncChainFilterToAuth(){
+  activeChains = getActiveChains();
+  renderChainFilter();
+  const cf = document.getElementById('chainFilter');
+  if(cf){
+    const multiChain = Object.keys(CHAIN_REGISTRY).length >= 2;
+    cf.style.display = (isLoggedIn() && multiChain) ? '' : 'none';
+  }
+  applyFilters();
+}
 
 function saveDisabledChains(){
   localStorage.setItem('disabledChains', JSON.stringify(Array.from(disabledChains)));
@@ -1991,7 +2012,7 @@ document.getElementById('chainFilterBody')?.addEventListener('change', (e) => {
   }
 
   const saved = localStorage.getItem('chainFilterCollapsed');
-  setCollapsed(saved === null ? true : saved === '1'); // collapsed by default so it doesn't crowd the legend
+  setCollapsed(saved === null ? false : saved === '1'); // expanded by default in the drawer
 
   toggle.addEventListener('click', () => {
     setCollapsed(!body.classList.contains('collapsed'));
@@ -2065,6 +2086,7 @@ function updateAccountUI(){
   const _cb = document.getElementById('communityBanner');
   if(_cb) _cb.style.display = loggedIn ? 'none' : '';   // banner is logged-out only
   document.body.classList.toggle('logged-in', loggedIn);   // gates signed-in-only UI (theme toggle, etc.)
+  syncChainFilterToAuth();                                  // logged-out shows all chains; logged-in restores the filter
   const accountBtn = document.getElementById('accountToggle');
   if(loggedIn){
     const email = window.__currentUser.email || '';

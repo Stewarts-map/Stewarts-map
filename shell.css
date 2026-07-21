@@ -345,3 +345,33 @@ body:not(.logged-in) #appDrawer #themeToggle{ display:none !important; }
 .rate-flash.show{ opacity:1; pointer-events:auto; }
 .rate-flash.err{ color:#c62828; }
 @media (prefers-reduced-motion: reduce){ .rate-flash{ transition:none; } }
+
+/* ---------- Chains filter relocated into the hamburger drawer (signed-in only) ---------- */
+/* The chain filter used to be a floating map pill; it now lives inside #appDrawer as a
+   section. These rules strip the pill chrome and restyle it to match the drawer's rows.
+   Visibility is driven by app.js (syncChainFilterToAuth); this CSS also hard-hides it when
+   logged out so it never flashes before the auth state resolves. */
+body:not(.logged-in) #appDrawer #chainFilter{ display:none !important; }
+
+#appDrawer #chainFilter{
+  background:transparent !important; border:0 !important; border-top:1px solid var(--shell-line) !important;
+  border-radius:0 !important; box-shadow:none !important;
+  width:100% !important; max-width:none !important; margin:0 !important; padding:6px 0 !important;
+}
+#appDrawer #chainFilterToggle{
+  display:flex !important; align-items:center; gap:10px;
+  padding:15px 20px !important; margin:0 !important;
+  font-size:15px !important; font-weight:700 !important; color:var(--shell-ink) !important; cursor:pointer;
+}
+#appDrawer #chainFilterToggle #chainFilterArrow{ margin-left:auto; transition:transform .16s; }
+#appDrawer #chainFilterToggle:active{ background:var(--shell-chrome2); }
+
+#appDrawer #chainFilterBody{ margin:0 !important; padding:0 0 8px !important; }
+#appDrawer .chain-filter-row{
+  padding:11px 20px 11px 46px !important;     /* indent past the header's emoji so names line up */
+  gap:10px !important; font-size:15px !important; font-weight:600; white-space:normal;
+  color:var(--shell-ink) !important;
+}
+#appDrawer .chain-filter-row:active{ background:var(--shell-chrome2); }
+#appDrawer .chain-filter-row input{ width:18px; height:18px; flex:none; }
+#appDrawer .chain-filter-row .dot{ width:12px; height:12px; border-radius:50%; flex:none; border:1.5px solid #fff; }
