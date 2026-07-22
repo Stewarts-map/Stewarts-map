@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled != false;
+    }
+
+    // Admin authorization records: only existing admins can read/write them.
+    match /admins/{uid} {
+      allow read, write: if isAdmin();
+    }
+
+    // Add `|| isAdmin()` to the write rule for every collection FlushPanel moderates.
+    // Examples:
+    match /tips/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /reports/{id} { allow read, write: if isAdmin(); }
+    match /missingReports/{id} { allow read, write: if isAdmin(); }
+    match /aggregates/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /votes/{id} { allow read, write: if isAdmin(); }
+  }
+}

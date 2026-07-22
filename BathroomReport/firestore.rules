@@ -1,0 +1,170 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    //  Shared helpers
+    // ============================================================
+    function signedIn() { return request.auth != null; }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled != false;
+    }
+
+    // A community write must belong to the signed-in caller: the doc's clientId field
+    // must equal their uid. (getEffectiveId() on the client returns the uid when signed in,
+    // and every community write is sign-in-gated in the app UI.)
+    function ownedByCaller() {
+      return signedIn() && request.resource.data.clientId == request.auth.uid;
+    }
+
+    // Public submissions may not set moderator-only workflow fields.
+    function hasNoModeratorFields() {
+      return !request.resource.data.keys().hasAny([
+        'moderatorNote','moderatorNotes','resolvedAt','resolvedBy',
+        'dismissedAt','dismissedBy','closedAt','closedBy','updatedByAdmin'
+      ]);
+    }
+
+    // Public submissions may omit status; if present it must start as pending.
+    function startsPending() {
+      return !request.resource.data.keys().hasAny(['status'])
+        || request.resource.data.status == 'pending';
+    }
+
+    // Only recognized workflow states may be saved by FlushPanel.
+    function validReportStatus() {
+      return !request.resource.data.keys().hasAny(['status'])
+        || request.resource.data.status in ['pending','resolved','dismissed'];
+    }
+
+
+    // ============================================================
+    //  Administrator authorization (managed from the Firebase Console)
+    // ============================================================
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;   // no one can grant themselves admin from a client
+    }
+
+
+    // ============================================================
+    //  Community ratings
+    // ============================================================
+    // Anyone may READ ratings. Writing requires sign-in AND the doc must be the caller's
+    // own vote: its id is "<locId>_<uid>" and its clientId is the caller's uid. This blocks
+    // forging votes or overwriting someone else's rating.
+    match /votes/{id} {
+      allow read: if true;
+      allow create, update: if ownedByCaller()
+        && id == request.resource.data.locId + '_' + request.auth.uid;
+      allow delete: if signedIn() && resource.data.clientId == request.auth.uid;
+    }
+
+
+    // ============================================================
+    //  Aggregate rating totals
+    // ============================================================
+    // Rating totals are written ONLY by the recomputeBathroomAggregate Cloud Function (admin
+    // privileges bypass rules). No client may write them — they're derived from vote docs
+    // server-side, so they can't be forged or tampered with.
+    match /aggregates/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+
+    // ============================================================
+    //  Visitor tips
+    // ============================================================
+    match /tips/{id} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+
+    // ============================================================
+    //  Community activity log (feeds recap/most-recent)
+    // ============================================================
+    match /activity/{id} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+
+    // ============================================================
+    //  Per-user achievement progress
+    // ============================================================
+    // Each doc is keyed by the owner's uid; only that user may write their own.
+    match /achievements/{id} {
+      allow read: if true;
+      allow write: if signedIn() && id == request.auth.uid;
+    }
+
+
+    // ============================================================
+    //  Check-ins (retired)
+    // ============================================================
+    // The app no longer creates check-ins. Reads stay open for any legacy path; all new
+    // writes are blocked.
+    match /checkins/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+
+    // ============================================================
+    //  Location overrides (admin corrections)
+    // ============================================================
+    // The public app reads these to apply corrected hours/addresses/coordinates.
+    // Only admins (FlushPanel) may create or change them.
+    match /overrides/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+
+    // ============================================================
+    //  Reports (public submit, admin moderate)
+    // ============================================================
+    match /reports/{id} {
+      allow create: if startsPending() && hasNoModeratorFields();
+      allow read:   if isAdmin();
+      allow update: if isAdmin() && validReportStatus();
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    //  Missing-location submissions (public submit, admin moderate)
+    // ============================================================
+    match /missingReports/{id} {
+      allow create: if startsPending() && hasNoModeratorFields();
+      allow read:   if isAdmin();
+      allow update: if isAdmin() && validReportStatus();
+      allow delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    //  Moderation blocklist
+    // ============================================================
+    // The app may check one known document id, but cannot download the whole list.
+    match /blockedDevices/{id} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    // ============================================================
+    //  Default deny — anything not listed above is inaccessible
+    // ============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>FlushPanel — BathroomReport moderation</title>
+
+<!-- Bundled location data (free — plain JS, no Firestore reads). Used only to
+     pre-fill the Fix panel with a location's current values. The report list
+     itself renders from each report's own snapshot and needs none of this. -->
+<script src="stewarts-locations.js" defer></script>
+<script src="alltownfresh-locations.js" defer></script>
+<script src="byrne-dairy-locations.js" defer></script>
+<script src="parkers-locations.js" defer></script>
+<script src="sheetz-locations.js" defer></script>
+<script src="racetrac-locations.js" defer></script>
+<script src="wawa-locations.js" defer></script>
+<script src="cumberland-farms-locations.js" defer></script>
+<script src="fastrac-locations.js" defer></script>
+
+<style>
+  :root{
+    --bg:#091322; --bg2:#0d1a2b; --surface:#111f32; --surface2:#16283e; --surface3:#1b3049;
+    --text:#f7fbff; --muted:#91a6bb; --accent:#43c6cb; --accent2:#2aa8b0;
+    --line:rgba(145,166,187,.16); --danger:#ef5b63; --success:#57c891; --warning:#f3bd63;
+    --shadow:0 20px 55px rgba(0,0,0,.28); --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 80% -10%, #10233a 0%, var(--bg) 55%) fixed;
+    color:var(--text); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh; -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit; cursor:pointer}
+  input,select,textarea{font:inherit}
+  a{color:var(--accent)}
+  .hidden{display:none !important}
+
+  /* ---------- Login ---------- */
+  .login-wrap{min-height:100vh; display:grid; place-items:center; padding:24px}
+  .login-card{
+    width:100%; max-width:380px; background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); padding:30px 26px; box-shadow:var(--shadow)
+  }
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px; font-weight:900; letter-spacing:-.02em; font-size:20px}
+  .brand .dot{width:11px; height:11px; border-radius:50%; background:var(--accent); box-shadow:0 0 14px var(--accent)}
+  .login-card p{color:var(--muted); margin:0 0 22px}
+  .field{display:block; margin-bottom:14px}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:700}
+  .field input{
+    width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line);
+    background:var(--bg2); color:var(--text)
+  }
+  .field input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+  .btn{
+    border:1px solid var(--line); background:var(--surface2); color:var(--text);
+    border-radius:10px; padding:10px 14px; font-weight:800; font-size:13px
+  }
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent); color:#04121b; border-color:transparent}
+  .btn.primary:hover{background:var(--accent2)}
+  .btn.full{width:100%; justify-content:center}
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+  .auth-msg{margin-top:14px; font-size:13px; min-height:18px}
+  .auth-msg.error{color:var(--danger)}
+
+  /* ---------- App shell ---------- */
+  .app{display:grid; grid-template-columns:220px 1fr; min-height:100vh}
+  .sidebar{
+    background:var(--bg2); border-right:1px solid var(--line); padding:20px 14px;
+    display:flex; flex-direction:column; gap:6px; position:sticky; top:0; height:100vh
+  }
+  .sidebar .brand{font-size:17px; padding:0 6px 14px}
+  .side-label{font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:#5f7691; font-weight:800; padding:8px 8px 4px}
+  .nav-link{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    padding:10px 12px; border:0; border-radius:10px; background:transparent; color:#b8c8d7; font-weight:700; font-size:13px
+  }
+  .nav-link:hover{background:rgba(67,198,203,.10); color:var(--accent)}
+  .nav-link.active{background:rgba(67,198,203,.14); color:var(--accent)}
+  .nav-badge{margin-left:auto; min-width:22px; height:20px; padding:0 6px; border-radius:999px;
+    background:rgba(67,198,203,.16); color:var(--accent); display:inline-grid; place-items:center; font-size:11px; font-weight:800}
+  .sidebar-foot{margin-top:auto; border-top:1px solid var(--line); padding-top:12px}
+  .who{font-size:11px; color:var(--muted); padding:0 8px 8px; word-break:break-all}
+
+  .main{padding:26px 28px 60px; max-width:1000px; width:100%}
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:22px}
+  .topbar h1{font-size:24px; letter-spacing:-.03em; margin:0}
+  .topbar .sub{color:var(--muted); font-size:13px; margin-top:3px}
+  .toolbar{display:flex; gap:8px}
+
+  .global-error{background:rgba(239,91,99,.12); border:1px solid rgba(239,91,99,.3); color:#ffb4b8;
+    padding:12px 14px; border-radius:12px; margin-bottom:18px; font-size:13px}
+
+  /* ---------- Tabs ---------- */
+  .filter-tabs{display:flex; gap:7px; flex-wrap:wrap; margin-bottom:16px}
+  .filter-tab{border:1px solid var(--line); background:var(--surface); color:#9db0c1;
+    border-radius:999px; padding:7px 13px; font-size:12px; font-weight:800}
+  .filter-tab.active{background:var(--accent); border-color:transparent; color:#04121b}
+
+  /* ---------- Cards ---------- */
+  .page{display:none}
+  .page.active{display:block}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:12px}
+  .card-head{display:flex; justify-content:space-between; gap:12px; align-items:flex-start}
+  .card-title{font-size:15px; font-weight:800; margin:0}
+  .card-loc{font-size:12.5px; color:#c5d2de; margin-top:4px}
+  .chips{display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; margin:10px 0 2px}
+  .chip{display:inline-flex; align-items:center; align-self:flex-start; flex:0 0 auto; gap:4px; padding:3px 9px; border-radius:999px;
+    background:#0c1929; border:1px solid #26384c; font-size:11px; font-weight:700; color:#c5d2de; text-decoration:none; white-space:nowrap}
+  .chip.mono{font-family:ui-monospace,SFMono-Regular,monospace}
+  .chip.link{color:#8fd3ff; border-color:rgba(143,211,255,.3)}
+  .chip.app{color:#7ee0ad; border-color:rgba(126,224,173,.3)}
+  .card-copy{margin:12px 0; color:#c7d5e2; font-size:13px; white-space:pre-wrap}
+  .card-note{background:var(--bg2); border-left:3px solid var(--accent); border-radius:6px;
+    padding:8px 10px; font-size:12.5px; color:#c7d5e2; margin:10px 0}
+  .card-foot{display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:6px}
+  .meta{color:#7f93a6; font-size:11.5px}
+  .actions{display:flex; gap:7px; flex-wrap:wrap}
+  .mini{border:1px solid var(--line); background:var(--surface2); color:#dce7ef; border-radius:9px; padding:7px 11px; font-size:11px; font-weight:800}
+  .mini:hover{filter:brightness(1.12)}
+  .mini.fix{background:rgba(67,198,203,.13); color:var(--accent); border-color:rgba(67,198,203,.3)}
+  .mini.resolve{background:rgba(87,200,145,.13); color:#7ee0ad; border-color:rgba(87,200,145,.28)}
+  .mini.dismiss{background:rgba(145,166,187,.1); color:#bac6d1}
+  .mini.reopen{background:rgba(243,189,99,.12); color:var(--warning)}
+  .mini.danger{background:rgba(239,91,99,.12); color:#ff8f95; border-color:rgba(239,91,99,.24)}
+  .mini:disabled{opacity:.5; cursor:not-allowed}
+
+  .pill{display:inline-flex; padding:4px 9px; border-radius:999px; font-size:10px; font-weight:850; text-transform:uppercase; letter-spacing:.05em}
+  .pill.pending{background:rgba(243,189,99,.14); color:var(--warning)}
+  .pill.resolved{background:rgba(87,200,145,.14); color:var(--success)}
+  .pill.dismissed{background:rgba(145,166,187,.12); color:#aab8c5}
+
+  .empty{padding:40px 20px; text-align:center; color:var(--muted); background:var(--surface); border:1px dashed var(--line); border-radius:14px}
+  .loading{color:var(--muted); padding:30px; text-align:center}
+
+  /* ---------- Fix modal ---------- */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(4,10,18,.7); display:grid; place-items:center; padding:20px; z-index:50}
+  .modal{background:var(--surface); border:1px solid var(--line); border-radius:18px; width:100%; max-width:560px;
+    max-height:90vh; overflow:auto; box-shadow:var(--shadow)}
+  .modal-head{position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--line);
+    padding:18px 20px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px}
+  .modal-head h2{margin:0; font-size:17px}
+  .modal-head .sub{color:var(--muted); font-size:12px; margin-top:3px; font-family:ui-monospace,monospace}
+  .x{background:none; border:0; color:var(--muted); font-size:22px; line-height:1; padding:0 4px}
+  .modal-body{padding:18px 20px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .fld{margin-bottom:13px}
+  .fld label{display:block; font-size:11.5px; color:var(--muted); font-weight:700; margin-bottom:5px}
+  .fld input{width:100%; padding:9px 11px; border-radius:9px; border:1px solid var(--line); background:var(--bg2); color:var(--text)}
+  .fld input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+  .fld .hint{font-size:11px; color:#6f8398; margin-top:4px}
+  .fld input.dirty{border-color:var(--warning)}
+  details.advanced{margin:6px 0 4px; border:1px solid var(--line); border-radius:10px; padding:0 12px; background:var(--bg2)}
+  details.advanced summary{cursor:pointer; padding:11px 0; font-weight:800; font-size:12.5px; color:#c7d5e2}
+  .day-row{display:grid; grid-template-columns:52px 1fr; gap:8px; align-items:center; margin-bottom:7px}
+  .day-row span{font-size:12px; color:var(--muted); font-weight:700; text-transform:capitalize}
+  .day-row input{padding:7px 9px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--text)}
+  .modal-foot{position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--line);
+    padding:14px 20px; display:flex; gap:9px; justify-content:flex-end; flex-wrap:wrap}
+  .resolve-check{display:flex; align-items:center; gap:7px; margin-right:auto; font-size:12.5px; color:#c7d5e2}
+  .resolve-check input{width:16px; height:16px; accent-color:var(--accent)}
+
+  /* ---------- Toast ---------- */
+  #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--surface3); border:1px solid var(--line); color:var(--text); padding:12px 18px;
+    border-radius:12px; font-size:13px; font-weight:700; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:.25s; z-index:80}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  #toast.err{border-color:rgba(239,91,99,.5)}
+
+  @media(max-width:760px){
+    .app{grid-template-columns:1fr}
+    .sidebar{position:static; height:auto; flex-direction:row; flex-wrap:wrap; align-items:center; gap:6px}
+    .sidebar .brand{width:100%; padding-bottom:8px}
+    .side-label,.sidebar-foot{display:none}
+    .nav-link{width:auto}
+    .main{padding:18px 14px 50px}
+    .grid2{grid-template-columns:1fr}
+  }
+.tip-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid rgba(255,255,255,.08); }
+.tip-row:first-of-type{ border-top:0; margin-top:4px; }
+.tip-text{ flex:1; font-size:14px; line-height:1.4; word-break:break-word; }
+.tip-acts{ display:flex; gap:6px; flex:none; }
+  .panel-version{ margin-top:10px; font-size:10.5px; color:#6c7f92; letter-spacing:.02em; text-align:center; }
+  /* Hard cap so chips/pills can never balloon into tall tubes (they're single-line labels). */
+  .chip, .pill{ display:inline-flex !important; align-items:center !important; align-self:flex-start !important;
+    flex:0 0 auto !important; height:auto !important; min-height:0 !important; max-height:28px !important;
+    line-height:1.25 !important; overflow:hidden !important; }
+  .add-select{ width:100%; padding:9px 11px; border-radius:9px; border:1px solid var(--line); background:var(--bg2); color:var(--text); font:inherit; }
+  .mini.primary-mini{ background:var(--accent); border-color:transparent; color:#04121b; }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div class="login-wrap" id="loginView">
+  <div class="login-card">
+    <div class="brand"><span class="dot"></span> FlushPanel</div>
+    <p>Report moderation for BathroomReport.</p>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" placeholder="admin@example.com">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button class="btn primary full" id="loginBtn">Sign in</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div class="app hidden" id="appView">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> FlushPanel</div>
+    <div class="side-label">Moderation</div>
+    <button class="nav-link active" data-page="reports">⚑ Reports <span class="nav-badge" id="badgeReports">0</span></button>
+    <button class="nav-link" data-page="requests">＋ Location requests <span class="nav-badge" id="badgeRequests">0</span></button>
+    <button class="nav-link" data-page="tips">💬 Tips</button>
+    <div class="sidebar-foot">
+      <div class="who" id="whoami"></div>
+      <button class="btn full" id="signoutBtn">Sign out</button>
+      <div class="panel-version">FlushPanel v2.2 · 2026-07-20</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Reports</h1>
+        <div class="sub" id="pageSub">Flags on existing locations.</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="refreshBtn">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div class="global-error hidden" id="globalError"></div>
+
+    <!-- Reports -->
+    <section class="page active" data-view="reports">
+      <div class="filter-tabs" id="reportFilters">
+        <button class="filter-tab active" data-status="pending">Pending</button>
+        <button class="filter-tab" data-status="resolved">Resolved</button>
+        <button class="filter-tab" data-status="dismissed">Dismissed</button>
+        <button class="filter-tab" data-status="all">All</button>
+      </div>
+      <div id="reportsList"><div class="loading">Loading reports…</div></div>
+    </section>
+
+    <!-- Requests -->
+    <section class="page" data-view="requests">
+      <div id="requestsList"><div class="loading">Loading requests…</div></div>
+    </section>
+
+    <!-- Tips -->
+    <section class="page" data-view="tips">
+      <div id="tipsList"><div class="loading">Open to load tips…</div></div>
+    </section>
+  </main>
+</div>
+
+<!-- Fix modal -->
+<div class="modal-backdrop hidden" id="fixModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h2 id="fixTitle">Fix location</h2>
+        <div class="sub" id="fixLocId"></div>
+      </div>
+      <button class="x" id="fixClose" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fld">
+        <label>Display name</label>
+        <input data-field="locName" type="text">
+      </div>
+      <div class="fld">
+        <label>Address</label>
+        <input data-field="addr" type="text">
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>City</label><input data-field="city" type="text"></div>
+        <div class="fld"><label>State</label><input data-field="state" type="text"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>ZIP</label><input data-field="zipCode" type="text"></div>
+        <div class="fld"><label>Phone</label><input data-field="phone" type="text"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>Latitude</label><input data-field="lat" type="text" inputmode="decimal"></div>
+        <div class="fld"><label>Longitude</label><input data-field="lng" type="text" inputmode="decimal"></div>
+      </div>
+      <div class="fld">
+        <label>Hours</label>
+        <input data-field="hrs" type="text" placeholder="0430-2400  ·  24  ·  closed">
+        <div class="hint">Single daily window. Use <b>0430-2400</b> style, <b>24</b> for 24h, <b>closed</b>, or blank to clear.</div>
+      </div>
+      <details class="advanced">
+        <summary>Per-day hours (optional — overrides the single window)</summary>
+        <div id="dayRows" style="padding:6px 0 12px"></div>
+        <div class="hint" style="padding-bottom:12px">Fill any day to set per-day hours. Leaving all blank keeps the single window above. Same value format per day.</div>
+      </details>
+    </div>
+    <div class="modal-foot">
+      <label class="resolve-check"><input type="checkbox" id="resolveOnSave" checked> Resolve this report on save</label>
+      <button class="btn" id="fixCancel">Cancel</button>
+      <button class="btn primary" id="fixSave">Save correction</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add-store modal -->
+<div class="modal-backdrop hidden" id="addModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>Add as store</h2><div class="sub">Writes an override → next bake creates it in the chain's file.</div></div>
+      <button class="x" id="addClose" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fld"><label>Chain</label><select id="addChain" class="add-select"></select></div>
+      <div class="fld"><label>Display name</label><input id="addName" type="text" placeholder="Crane Street, Schenectady"></div>
+      <div class="fld"><label>Address</label><input id="addAddr" type="text"></div>
+      <div class="grid2">
+        <div class="fld"><label>City</label><input id="addCity" type="text"></div>
+        <div class="fld"><label>State</label><input id="addState" type="text"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>ZIP</label><input id="addZip" type="text"></div>
+        <div class="fld"><label>Phone</label><input id="addPhone" type="text"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label>Latitude</label><input id="addLat" type="text" inputmode="decimal"></div>
+        <div class="fld"><label>Longitude</label><input id="addLng" type="text" inputmode="decimal"></div>
+      </div>
+      <div class="fld"><label>Hours</label><input id="addHrs" type="text" placeholder="0430-2400 · 24 · closed"><div class="hint">Blank = hours unknown (that's fine — the app shows &ldquo;hours unavailable&rdquo;).</div></div>
+      <div class="fld"><label>Store ID</label><input id="addId" type="text"><div class="hint">Auto-filled from the name. Must be unique — it becomes the location's permanent id.</div></div>
+    </div>
+    <div class="modal-foot">
+      <label class="resolve-check"><input type="checkbox" id="addRemove" checked> Remove the request after adding</label>
+      <button class="btn" id="addCancel">Cancel</button>
+      <button class="btn primary" id="addSave">Add store</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, arrayRemove, arrayUnion
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// Same project as the public app (public client config — safe to ship).
+const firebaseConfig = {
+  apiKey: "AIzaSyDMu-9NYeqvBD4Mbp2jctoAF89raE7p8UM",
+  authDomain: "stewarts-map.firebaseapp.com",
+  projectId: "stewarts-map",
+  storageBucket: "stewarts-map.firebasestorage.app",
+  messagingSenderId: "1024042855550",
+  appId: "1:1024042855550:web:02120ef818d67c57e17c2f",
+  measurementId: "G-Q63YXL8XVY"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// ---- Editable override fields (must match the public app's applyOverrideToLocation
+//      and bake-overrides.js FIELD_MAP). locName maps to the seed's `n`. ----
+const OVERRIDE_TEXT_FIELDS = ['locName','addr','city','state','zipCode','phone','hrs'];
+const HRS_DAY_KEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+
+// NOTE — amenities (e.g. wheelchair accessible) are deliberately NOT here yet.
+// The public app reads accessibility as a community vote, not a location field, so an
+// override amenity wouldn't surface on the map. When the public app + bake-overrides.js
+// are extended to read a location-level amenity, add its editor + save mapping here.
+
+// ---------- Seed index (bundled JS, no reads) ----------
+let locById = {};
+function buildSeedIndex(){
+  locById = {};
+  for(const key of Object.keys(window)){
+    const val = window[key];
+    if(Array.isArray(val) && /Locations$/.test(key)){
+      val.forEach(l => { if(l && l.id && !locById[l.id]) locById[l.id] = l; });
+    }
+  }
+}
+
+// ---------- State ----------
+let allReports = [];
+let allRequests = [];
+let reportFilter = 'pending';
+let currentFix = null; // { locId, effective }
+let currentUser = null;
+
+// ---------- Helpers ----------
+const $ = sel => document.querySelector(sel);
+const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+const when = ts => ts ? new Date(ts).toLocaleString() : 'Unknown time';
+function toast(msg, isErr){
+  const t = $('#toast'); t.textContent = msg; t.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(toast._t); toast._t = setTimeout(() => { t.className = ''; }, 2600);
+}
+function statusOf(r){ return r.status || 'pending'; }
+
+// ================= AUTH =================
+$('#loginBtn').addEventListener('click', doLogin);
+$('#password').addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
+$('#email').addEventListener('keydown', e => { if(e.key === 'Enter') $('#password').focus(); });
+
+async function doLogin(){
+  const email = $('#email').value.trim();
+  const password = $('#password').value;
+  const msg = $('#authMsg');
+  msg.className = 'auth-msg'; msg.textContent = '';
+  if(!email || !password){ msg.className = 'auth-msg error'; msg.textContent = 'Enter your email and password.'; return; }
+  $('#loginBtn').disabled = true; $('#loginBtn').textContent = 'Signing in…';
+  try{
+    await signInWithEmailAndPassword(auth, email, password);
+    // onAuthStateChanged handles the rest.
+  }catch(e){
+    msg.className = 'auth-msg error';
+    msg.textContent = (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found')
+      ? 'Wrong email or password.' : 'Sign-in failed — try again.';
+    $('#loginBtn').disabled = false; $('#loginBtn').textContent = 'Sign in';
+  }
+}
+
+$('#signoutBtn').addEventListener('click', () => signOut(auth));
+
+onAuthStateChanged(auth, async (user) => {
+  if(!user){ showLogin(); return; }
+  // Verify admin before showing anything.
+  try{
+    const snap = await getDoc(doc(db, 'admins', user.uid));
+    if(!snap.exists() || snap.data().enabled === false){
+      await signOut(auth);
+      const msg = $('#authMsg'); msg.className = 'auth-msg error';
+      msg.textContent = 'That account isn’t an admin.';
+      showLogin(); return;
+    }
+  }catch(e){
+    await signOut(auth);
+    const msg = $('#authMsg'); msg.className = 'auth-msg error';
+    msg.textContent = 'Could not verify admin access.';
+    showLogin(); return;
+  }
+  currentUser = user;
+  $('#whoami').textContent = user.email || user.uid;
+  showApp();
+  buildSeedIndex();
+  loadAll();
+});
+
+function showLogin(){
+  currentUser = null;
+  $('#appView').classList.add('hidden');
+  $('#loginView').classList.remove('hidden');
+  $('#loginBtn').disabled = false; $('#loginBtn').textContent = 'Sign in';
+  $('#password').value = '';
+}
+function showApp(){
+  $('#loginView').classList.add('hidden');
+  $('#appView').classList.remove('hidden');
+  const msg = $('#authMsg'); msg.className = 'auth-msg'; msg.textContent = '';
+}
+
+// ================= NAV =================
+document.querySelectorAll('.nav-link').forEach(btn => btn.addEventListener('click', () => {
+  const page = btn.dataset.page;
+  document.querySelectorAll('.nav-link').forEach(n => n.classList.toggle('active', n === btn));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.view === page));
+  const _titles = { reports:'Reports', requests:'Location requests', tips:'Tips' };
+  const _subs = { reports:'Flags on existing locations.', requests:'Submissions for places that aren’t on the map yet.', tips:'Community tips — edit or remove.' };
+  $('#pageTitle').textContent = _titles[page] || 'Reports';
+  $('#pageSub').textContent = _subs[page] || '';
+  if(page === 'tips') loadTips();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}));
+
+// ================= DATA LOAD =================
+// The entire session read budget lives here: both collections are small (they only
+// hold flagged/requested places), so a full read stays cheap no matter how many
+// locations BathroomReport ships. No aggregates / votes / tips are ever read.
+async function loadAll(){
+  $('#refreshBtn').disabled = true;
+  $('#globalError').classList.add('hidden');
+  try{
+    const [repSnap, reqSnap] = await Promise.all([
+      getDocs(collection(db, 'reports')),
+      getDocs(collection(db, 'missingReports'))
+    ]);
+
+    allReports = [];
+    repSnap.forEach(d => allReports.push({ id: d.id, ...d.data() }));
+    allReports.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    allRequests = [];
+    reqSnap.forEach(d => allRequests.push({ id: d.id, ...d.data() }));
+    allRequests.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    renderReports();
+    renderRequests();
+    updateBadges();
+  }catch(e){
+    console.error('Load failed', e);
+    const el = $('#globalError'); el.classList.remove('hidden');
+    el.textContent = 'Could not load the moderation queues. Check your connection and that this account has admin access.';
+  }finally{
+    $('#refreshBtn').disabled = false;
+  }
+}
+$('#refreshBtn').addEventListener('click', loadAll);
+
+function updateBadges(){
+  const pendingReports = allReports.filter(r => statusOf(r) === 'pending').length;
+  $('#badgeReports').textContent = pendingReports;
+  $('#badgeRequests').textContent = allRequests.length;
+}
+
+// ================= REPORTS =================
+document.querySelectorAll('#reportFilters .filter-tab').forEach(tab =>
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#reportFilters .filter-tab').forEach(t => t.classList.toggle('active', t === tab));
+    reportFilter = tab.dataset.status;
+    renderReports();
+  })
+);
+
+function renderReports(){
+  const root = $('#reportsList');
+  const rows = reportFilter === 'all' ? allReports : allReports.filter(r => statusOf(r) === reportFilter);
+  if(!rows.length){
+    root.innerHTML = `<div class="empty">No ${reportFilter === 'all' ? '' : reportFilter + ' '}reports.</div>`;
+    return;
+  }
+  root.innerHTML = rows.map(r => {
+    const st = statusOf(r);
+    const locId = r.locId || '';
+    const name = r.locName || 'BathroomReport';
+    const addr = r.addr || '';
+    const hasCoords = typeof r.lat === 'number' && typeof r.lng === 'number';
+    const mapsUrl = hasCoords ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}` : '';
+    const appUrl = locId ? `./index.html?loc=${encodeURIComponent(locId)}` : '';
+    const cityState = [r.city, r.state].filter(Boolean).join(', ');
+    const storeNum = (r.storeNumber != null && r.storeNumber !== '') ? r.storeNumber : '';
+    const chips = [
+      r.chain ? `<span class="chip">${esc(r.chain)}${storeNum ? ' #' + esc(storeNum) : ''}</span>` : '',
+      cityState ? `<span class="chip">${esc(cityState)}</span>` : '',
+      locId ? `<span class="chip mono">ID ${esc(locId)}</span>` : '',
+      hasCoords ? `<a class="chip link" href="${mapsUrl}" target="_blank" rel="noopener">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</a>` : '',
+      appUrl ? `<a class="chip app" href="${appUrl}" target="_blank" rel="noopener">Open in app ↗</a>` : ''
+    ].join('');
+    return `<article class="card">
+      <div class="card-head">
+        <div>
+          <h3 class="card-title">${esc(r.reason || 'Report')}</h3>
+          <div class="card-loc">${esc(name)}${addr ? ' · ' + esc(addr) : ''}</div>
+        </div>
+        <span class="pill ${st}">${st}</span>
+      </div>
+      <div class="chips">${chips}</div>
+      ${r.moderatorNote ? `<div class="card-note"><b>Note:</b> ${esc(r.moderatorNote)}</div>` : ''}
+      <div class="card-foot">
+        <span class="meta">Submitted ${when(r.ts)}</span>
+        <div class="actions">
+          ${locId ? `<button class="mini fix" data-act="fix" data-id="${r.id}">✎ Fix location</button>` : ''}
+          <button class="mini" data-act="note" data-id="${r.id}">✐ Note</button>
+          ${st !== 'pending' ? `<button class="mini reopen" data-act="status" data-status="pending" data-id="${r.id}">Reopen</button>` : ''}
+          ${st !== 'resolved' ? `<button class="mini resolve" data-act="status" data-status="resolved" data-id="${r.id}">Resolve</button>` : ''}
+          ${st !== 'dismissed' ? `<button class="mini dismiss" data-act="status" data-status="dismissed" data-id="${r.id}">Dismiss</button>` : ''}
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+// Report actions (event delegation)
+$('#reportsList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]'); if(!btn) return;
+  const report = allReports.find(r => r.id === btn.dataset.id); if(!report) return;
+
+  if(btn.dataset.act === 'fix'){ openFix(report); return; }
+
+  if(btn.dataset.act === 'note'){
+    const existing = report.moderatorNote || '';
+    const note = prompt('Moderator note (visible in FlushPanel only):', existing);
+    if(note === null) return;
+    btn.disabled = true;
+    try{
+      await updateDoc(doc(db, 'reports', report.id), { moderatorNote: note });
+      report.moderatorNote = note; renderReports(); toast('Note saved.');
+    }catch(err){ console.error(err); toast('Could not save note.', true); btn.disabled = false; }
+    return;
+  }
+
+  if(btn.dataset.act === 'status'){
+    const status = btn.dataset.status;
+    btn.disabled = true;
+    const ok = await setReportStatus(report, status);
+    if(!ok){ toast('Could not update — try again.', true); btn.disabled = false; }
+  }
+});
+
+async function setReportStatus(report, status){
+  const patch = { status };
+  if(status === 'resolved'){ patch.resolvedAt = Date.now(); patch.resolvedBy = currentUser.email || currentUser.uid; }
+  if(status === 'dismissed'){ patch.dismissedAt = Date.now(); patch.dismissedBy = currentUser.email || currentUser.uid; }
+  try{
+    await updateDoc(doc(db, 'reports', report.id), patch);
+    Object.assign(report, patch);
+    renderReports(); updateBadges();
+    toast(status === 'pending' ? 'Reopened.' : status.charAt(0).toUpperCase() + status.slice(1) + '.');
+    return true;
+  }catch(e){ console.error('status update failed', e); return false; }
+}
+
+// ================= FIX MODAL =================
+function effectiveValues(locId){
+  // Current values = seed ⊕ existing override. Returns the seed-key shape plus a
+  // normalized view for the form. (Override is fetched separately and merged in.)
+  const seed = locById[locId] || {};
+  return {
+    locName: seed.n || '',
+    addr: seed.addr || '',
+    city: seed.city || '',
+    state: seed.state || '',
+    zipCode: seed.zipCode || '',
+    phone: seed.phone || '',
+    hrs: seed.hrs || '',
+    hours: (seed.hours && typeof seed.hours === 'object') ? { ...seed.hours } : {},
+    lat: (seed.lat != null) ? Number(seed.lat) : null,
+    lng: (seed.lng != null) ? Number(seed.lng) : null
+  };
+}
+
+async function openFix(report){
+  const locId = report.locId;
+  const eff = effectiveValues(locId);
+
+  // Fall back to the report's own snapshot when the location isn't in bundled data.
+  if(!locById[locId]){
+    eff.locName = eff.locName || report.locName || '';
+    eff.addr = eff.addr || report.addr || '';
+    eff.city = eff.city || report.city || '';
+    eff.state = eff.state || report.state || '';
+    if(eff.lat == null && typeof report.lat === 'number') eff.lat = report.lat;
+    if(eff.lng == null && typeof report.lng === 'number') eff.lng = report.lng;
+  }
+
+  // Merge any existing override on top (one read).
+  try{
+    const ovSnap = await getDoc(doc(db, 'overrides', locId));
+    if(ovSnap.exists()){
+      const ov = ovSnap.data();
+      OVERRIDE_TEXT_FIELDS.forEach(f => { if(ov[f] !== undefined) eff[f] = ov[f]; });
+      if(ov.hours !== undefined && ov.hours && typeof ov.hours === 'object') eff.hours = { ...ov.hours };
+      if(typeof ov.lat === 'number') eff.lat = ov.lat;
+      if(typeof ov.lng === 'number') eff.lng = ov.lng;
+    }
+  }catch(e){ console.error('override read failed', e); }
+
+  currentFix = { locId, eff };
+  $('#fixTitle').textContent = 'Fix: ' + (eff.locName || report.locName || locId);
+  $('#fixLocId').textContent = locId;
+  $('#resolveOnSave').checked = statusOf(report) === 'pending';
+  $('#resolveOnSave').closest('.resolve-check').style.display = statusOf(report) === 'pending' ? '' : 'none';
+
+  // Fill text/number fields
+  document.querySelectorAll('#fixModal input[data-field]').forEach(inp => {
+    const f = inp.dataset.field;
+    inp.value = (f === 'lat' || f === 'lng') ? (eff[f] == null ? '' : eff[f]) : (eff[f] || '');
+    inp.classList.remove('dirty');
+  });
+
+  // Build per-day hour rows
+  const dayLabels = { sun:'Sun', mon:'Mon', tue:'Tue', wed:'Wed', thu:'Thu', fri:'Fri', sat:'Sat' };
+  $('#dayRows').innerHTML = HRS_DAY_KEYS.map(k =>
+    `<div class="day-row"><span>${dayLabels[k]}</span>
+      <input data-day="${k}" type="text" placeholder="0430-2400 · 24 · closed" value="${esc(eff.hours[k] || '')}"></div>`
+  ).join('');
+
+  $('#fixModal').classList.remove('hidden');
+}
+
+function closeFix(){ $('#fixModal').classList.add('hidden'); currentFix = null; }
+$('#fixClose').addEventListener('click', closeFix);
+$('#fixCancel').addEventListener('click', closeFix);
+$('#fixModal').addEventListener('click', e => { if(e.target === $('#fixModal')) closeFix(); });
+
+// Mark changed fields
+$('#fixModal').addEventListener('input', e => {
+  const inp = e.target.closest('input[data-field]');
+  if(inp && currentFix){
+    const f = inp.dataset.field;
+    const orig = (f === 'lat' || f === 'lng') ? (currentFix.eff[f] == null ? '' : String(currentFix.eff[f])) : (currentFix.eff[f] || '');
+    inp.classList.toggle('dirty', inp.value.trim() !== String(orig).trim());
+  }
+});
+
+$('#fixSave').addEventListener('click', saveFix);
+
+async function saveFix(){
+  if(!currentFix) return;
+  const { locId, eff } = currentFix;
+  const patch = {};   // only changed fields → keeps overrides minimal for baking
+
+  // Validate coordinates first so we never write a bad pin.
+  for(const f of ['lat','lng']){
+    const inp = document.querySelector(`#fixModal input[data-field="${f}"]`);
+    const raw = inp.value.trim();
+    const origStr = eff[f] == null ? '' : String(eff[f]);
+    if(raw !== origStr){
+      const num = Number(raw);
+      if(raw === '' || Number.isNaN(num)){
+        toast(`${f === 'lat' ? 'Latitude' : 'Longitude'} must be a number.`, true);
+        inp.focus(); return;
+      }
+      patch[f] = num;
+    }
+  }
+
+  // Text fields
+  OVERRIDE_TEXT_FIELDS.forEach(f => {
+    const inp = document.querySelector(`#fixModal input[data-field="${f}"]`);
+    const val = inp.value.trim();
+    const orig = (eff[f] || '').trim();
+    if(val !== orig) patch[f] = val;   // '' is a valid clear (matches app + bake convention)
+  });
+
+  // Per-day hours → build map only if any changed
+  const newHours = {};
+  let anyDay = false, daysChanged = false;
+  document.querySelectorAll('#dayRows input[data-day]').forEach(inp => {
+    const k = inp.dataset.day; const v = inp.value.trim();
+    if(v){ newHours[k] = v; anyDay = true; }
+    if((eff.hours[k] || '') !== v) daysChanged = true;
+  });
+  if(daysChanged) patch.hours = anyDay ? newHours : {};   // {} clears per-day hours
+
+  if(Object.keys(patch).length === 0){ toast('No changes to save.'); return; }
+
+  // Stamp identity so the override is self-describing + bakeable: chain routes a NEW store
+  // to the right *-locations.js file; locName becomes the baked record's display name.
+  const _rpt = allReports.find(r => r.locId === locId);
+  const _chain = (locById[locId] && locById[locId].chain) || (_rpt && _rpt.chainKey) || null;
+  if(_chain && patch.chain === undefined) patch.chain = _chain;
+  if(patch.locName === undefined){
+    const _nm = (locById[locId] && locById[locId].n) || (_rpt && _rpt.locName) || null;
+    if(_nm) patch.locName = _nm;
+  }
+  patch.updatedAt = Date.now();
+  patch.updatedByAdmin = currentUser.email || currentUser.uid;
+
+  $('#fixSave').disabled = true;
+  try{
+    // merge:true so we only touch the changed fields and keep any prior override data.
+    await setDoc(doc(db, 'overrides', locId), patch, { merge: true });
+
+    // Keep the bundled seed index in sync so re-opening shows the new values.
+    if(!locById[locId]) locById[locId] = { id: locId };
+    const seed = locById[locId];
+    if(patch.locName !== undefined) seed.n = patch.locName;
+    ['addr','city','state','zipCode','phone','hrs'].forEach(f => { if(patch[f] !== undefined) seed[f] = patch[f]; });
+    if(patch.hours !== undefined) seed.hours = patch.hours;
+    if(patch.lat !== undefined) seed.lat = patch.lat;
+    if(patch.lng !== undefined) seed.lng = patch.lng;
+
+    // Optionally resolve the report.
+    const report = allReports.find(r => r.locId === locId && statusOf(r) === 'pending');
+    if($('#resolveOnSave').checked && report){
+      await setReportStatus(report, 'resolved');
+    }
+    toast('Correction saved.');
+    closeFix();
+  }catch(e){
+    console.error('override save failed', e);
+    toast('Could not save — check the overrides write rule.', true);
+    $('#fixSave').disabled = false;
+    return;
+  }
+  $('#fixSave').disabled = false;
+}
+
+// ================= REQUESTS =================
+function renderRequests(){
+  const root = $('#requestsList');
+  if(!allRequests.length){ root.innerHTML = `<div class="empty">No location requests right now.</div>`; return; }
+  root.innerHTML = allRequests.map(m => {
+    const hasCoords = typeof m.lat === 'number' && typeof m.lng === 'number';
+    const mapsUrl = hasCoords ? `https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}` : '';
+    return `<article class="card">
+      <div class="card-head">
+        <div><h3 class="card-title">${esc(m.description || 'Missing location')}</h3></div>
+      </div>
+      <div class="chips">
+        ${hasCoords ? `<a class="chip link" href="${mapsUrl}" target="_blank" rel="noopener">📍 ${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</a>` : '<span class="chip">No pin</span>'}
+      </div>
+      <div class="card-foot">
+        <span class="meta">Submitted ${when(m.ts)}</span>
+        <div class="actions">
+          <button class="mini primary-mini" data-act="addstore" data-id="${m.id}">➕ Add as store</button>
+          <button class="mini resolve" data-act="added" data-id="${m.id}">✓ Added — remove</button>
+          <button class="mini danger" data-act="dismiss" data-id="${m.id}">✕ Dismiss — remove</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+$('#requestsList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]'); if(!btn) return;
+  const req = allRequests.find(m => m.id === btn.dataset.id); if(!req) return;
+  if(btn.dataset.act === 'addstore'){ openAddStore(req); return; }
+  const isAdded = btn.dataset.act === 'added';
+  const label = req.description ? `“${req.description}”` : 'this request';
+  const verb = isAdded ? 'Mark as added and remove' : 'Dismiss and remove';
+  if(!confirm(`${verb} ${label}? This deletes the request permanently.`)) return;
+  btn.disabled = true;
+  try{
+    await deleteDoc(doc(db, 'missingReports', req.id));
+    allRequests = allRequests.filter(m => m.id !== req.id);
+    renderRequests(); updateBadges();
+    toast(isAdded ? 'Marked added.' : 'Dismissed.');
+  }catch(err){
+    console.error('request delete failed', err);
+    toast('Could not remove — try again.', true);
+    btn.disabled = false;
+  }
+});
+
+// ================= TIPS (loaded on demand — keeps the default view cheap) =================
+let allTips = null; // { locId: [tip,...] } built once per session when Tips is first opened
+async function loadTips(){
+  if(allTips){ renderTips(); return; }
+  const list = $('#tipsList');
+  list.innerHTML = '<div class="loading">Loading tips…</div>';
+  try{
+    const snap = await getDocs(collection(db, 'tips'));
+    allTips = {};
+    snap.forEach(d => { const t = (d.data() && d.data().tips) || []; if(t.length) allTips[d.id] = t.slice(); });
+    renderTips();
+  }catch(e){
+    console.error('tips load failed', e);
+    list.innerHTML = '<div class="global-error">Could not load tips. Check admin access.</div>';
+  }
+}
+function renderTips(){
+  const list = $('#tipsList');
+  const ids = Object.keys(allTips || {});
+  if(!ids.length){ list.innerHTML = '<div class="empty">No tips to moderate.</div>'; return; }
+  ids.sort((a,b) => { const na=(locById[a]&&locById[a].n)||a, nb=(locById[b]&&locById[b].n)||b; return String(na).localeCompare(String(nb)); });
+  list.innerHTML = ids.map(locId => {
+    const seed = locById[locId];
+    const name = (seed && seed.n) || locId;
+    const rows = allTips[locId].map((t,i) =>
+      `<div class="tip-row"><span class="tip-text">${esc(t)}</span>` +
+      `<span class="tip-acts">` +
+      `<button class="mini" data-act="edit-tip" data-loc="${esc(locId)}" data-i="${i}">✎ Edit</button>` +
+      `<button class="mini danger" data-act="del-tip" data-loc="${esc(locId)}" data-i="${i}">✕ Remove</button>` +
+      `</span></div>`).join('');
+    return `<article class="card"><div class="card-head"><div><h3 class="card-title">${esc(name)}</h3><div class="sub">${esc(locId)}</div></div></div>${rows}</article>`;
+  }).join('');
+}
+$('#tipsList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]'); if(!btn) return;
+  const locId = btn.dataset.loc, i = parseInt(btn.dataset.i, 10);
+  const tips = allTips && allTips[locId];
+  if(!tips || tips[i] === undefined) return;
+  const oldText = tips[i];
+  if(btn.dataset.act === 'del-tip'){
+    if(!confirm('Remove this tip permanently?\n\n"' + oldText + '"')) return;
+    btn.disabled = true;
+    try{
+      await updateDoc(doc(db, 'tips', locId), { tips: arrayRemove(oldText) });
+      tips.splice(i, 1); if(!tips.length) delete allTips[locId];
+      renderTips(); toast('Tip removed.');
+    }catch(err){ console.error(err); toast('Could not remove tip.', true); btn.disabled = false; }
+  } else if(btn.dataset.act === 'edit-tip'){
+    const next = prompt('Edit tip (max 50 characters):', oldText);
+    if(next === null) return;
+    const trimmed = next.trim().slice(0, 50);
+    if(!trimmed){ toast('Tip cannot be empty.', true); return; }
+    if(trimmed === oldText) return;
+    try{
+      await updateDoc(doc(db, 'tips', locId), { tips: arrayRemove(oldText) });
+      await updateDoc(doc(db, 'tips', locId), { tips: arrayUnion(trimmed) });
+      tips[i] = trimmed; renderTips(); toast('Tip updated.');
+    }catch(err){ console.error(err); toast('Could not update tip.', true); }
+  }
+});
+
+
+// ===== Add a brand-new store from a location request =====
+function chainOptions(){
+  const out = [];
+  for(const key of Object.keys(window)){
+    if(Array.isArray(window[key]) && /Locations$/.test(key)){
+      const ck = key.replace(/Locations$/, '');
+      const label = ck.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
+      out.push({ key: ck, label });
+    }
+  }
+  out.sort((a,b) => a.label.localeCompare(b.label));
+  return out;
+}
+function slugify(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60); }
+let currentAdd = null;
+function openAddStore(req){
+  currentAdd = { reqId: req.id };
+  $('#addChain').innerHTML = '<option value="">— choose chain —</option>' +
+    chainOptions().map(c => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join('');
+  $('#addName').value = req.description || '';
+  $('#addAddr').value = '';
+  $('#addCity').value = ''; $('#addState').value = 'NY';
+  $('#addZip').value = ''; $('#addPhone').value = '';
+  $('#addLat').value = (typeof req.lat === 'number') ? req.lat : '';
+  $('#addLng').value = (typeof req.lng === 'number') ? req.lng : '';
+  $('#addHrs').value = '';
+  const idEl = $('#addId'); idEl.value = ''; delete idEl.dataset.touched;
+  $('#addRemove').checked = true;
+  suggestAddId();
+  $('#addModal').classList.remove('hidden');
+}
+function closeAddStore(){ $('#addModal').classList.add('hidden'); currentAdd = null; }
+function suggestAddId(){
+  const idEl = $('#addId');
+  if(idEl.dataset.touched) return;
+  idEl.value = slugify(($('#addName').value||'') + '-' + ($('#addCity').value||''));
+}
+$('#addClose').addEventListener('click', closeAddStore);
+$('#addCancel').addEventListener('click', closeAddStore);
+$('#addModal').addEventListener('click', e => { if(e.target === $('#addModal')) closeAddStore(); });
+$('#addName').addEventListener('input', suggestAddId);
+$('#addCity').addEventListener('input', suggestAddId);
+$('#addId').addEventListener('input', () => { $('#addId').dataset.touched = '1'; });
+
+async function saveAddStore(){
+  if(!currentAdd) return;
+  const chain = $('#addChain').value.trim();
+  const name = $('#addName').value.trim();
+  const latRaw = $('#addLat').value.trim(), lngRaw = $('#addLng').value.trim();
+  const id = slugify($('#addId').value.trim() || (name + '-' + $('#addCity').value.trim()));
+  if(!chain){ toast('Pick a chain.', true); return; }
+  if(!name){ toast('Enter a display name.', true); $('#addName').focus(); return; }
+  const lat = Number(latRaw), lng = Number(lngRaw);
+  if(latRaw==='' || Number.isNaN(lat) || lngRaw==='' || Number.isNaN(lng)){ toast('Latitude and longitude must be numbers.', true); return; }
+  if(!id){ toast('Enter a store ID.', true); $('#addId').focus(); return; }
+  if(locById[id]){ toast('That ID already exists — change it.', true); $('#addId').focus(); return; }
+
+  const patch = { chain, locName: name, addr: $('#addAddr').value.trim(), lat, lng,
+    updatedAt: Date.now(), updatedByAdmin: currentUser.email || currentUser.uid };
+  const city = $('#addCity').value.trim(); if(city) patch.city = city;
+  const st = $('#addState').value.trim(); if(st) patch.state = st;
+  const zip = $('#addZip').value.trim(); if(zip) patch.zipCode = zip;
+  const ph = $('#addPhone').value.trim(); if(ph) patch.phone = ph;
+  const hrs = $('#addHrs').value.trim(); if(hrs) patch.hrs = hrs;
+
+  $('#addSave').disabled = true;
+  try{
+    await setDoc(doc(db, 'overrides', id), patch, { merge: true });
+    locById[id] = { id, n: name, chain, lat, lng, addr: patch.addr };  // so a second add can't reuse the id
+    if($('#addRemove').checked){
+      await deleteDoc(doc(db, 'missingReports', currentAdd.reqId));
+      allRequests = allRequests.filter(m => m.id !== currentAdd.reqId);
+      renderRequests(); updateBadges();
+    }
+    toast('Store queued — run a bake to publish it.');
+    closeAddStore();
+  }catch(e){
+    console.error('add store failed', e);
+    toast('Could not save — check the overrides write rule.', true);
+  }
+  $('#addSave').disabled = false;
+}
+$('#addSave').addEventListener('click', saveAddStore);
+
+</script>
+</body>
+</html>

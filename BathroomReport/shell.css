@@ -1,0 +1,437 @@
+/* ============================================================
+   shell.css — Bathroom Report UI overhaul, Stage 1 (chrome only)
+   Loaded AFTER styles.css so it overrides the old chrome.
+   Targets existing element IDs; no app.js behavior is changed.
+   ============================================================ */
+
+:root{
+  --accent:#2ea1aa;                 /* logo teal — supersedes the old #38b8bb */
+  --accent-deep:#26828a;
+  --accent-ink:#04211f;
+  --shell-bg:#0e0f12;
+  --shell-chrome:#141619;
+  --shell-chrome2:#1b1e23;
+  --shell-line:rgba(255,255,255,.08);
+  --shell-ink:#f6f8fa;
+  --shell-muted:#9aa3ad;
+  --shell-shadow:0 12px 40px rgba(0,0,0,.45);
+}
+
+/* ---------- Elements the redesign drops (kept in DOM for app.js) ---------- */
+#chainBadge,
+#statPillRow,
+#installBanner .icon{ display:none !important; }
+
+/* ---------- Header: compact dark bar ---------- */
+#header{
+  background:var(--shell-chrome) !important;
+  border-bottom:1px solid var(--shell-line) !important;
+  padding:calc(env(safe-area-inset-top) + 8px) 12px 8px !important;
+  box-shadow:none !important;
+}
+#headerTopRow{
+  display:grid !important;
+  grid-template-columns:44px 1fr auto;
+  align-items:center; gap:8px; margin:0 !important;
+}
+#menuBtn{
+  width:44px; height:44px; border:0; background:transparent; color:var(--shell-ink);
+  font-size:22px; border-radius:12px; display:grid; place-items:center; cursor:pointer;
+}
+#menuBtn:active{ background:var(--shell-chrome2); }
+
+#headerBrand{
+  justify-self:center; display:flex; align-items:center; gap:9px; min-width:0;
+}
+#headerIcon{
+  width:40px !important; height:40px !important; border-radius:0 !important;
+  box-shadow:none !important; object-fit:contain;
+}
+#headerBrand h1{
+  font-size:clamp(12px, 3.4vw, 16px) !important; font-weight:900 !important; letter-spacing:.02em !important;
+  margin:0 !important; white-space:nowrap; color:var(--shell-ink) !important; line-height:1;
+  font-family:var(--font-display);
+}
+#headerBrand h1 .wm-accent{ color:var(--accent); }
+
+#headerActions{ display:flex; align-items:center; gap:6px; }
+#accountToggle{
+  padding:4px 14px !important; border-radius:999px !important;
+  border:1px solid var(--accent) !important; background:transparent !important;
+  color:var(--accent) !important; font-weight:800 !important; font-size:13px !important;
+  white-space:nowrap;
+}
+#accountToggle:active{ background:color-mix(in srgb, var(--accent) 14%, transparent) !important; }
+#themeToggle{
+  width:40px; height:40px; border-radius:12px !important; background:transparent !important;
+  border:0 !important; font-size:18px !important; color:var(--shell-ink) !important;
+}
+
+/* tagline under the wordmark (repurposed subtitle) */
+#headerSubtitle{
+  text-align:center !important; color:var(--shell-muted) !important;
+  font-size:10.5px !important; font-weight:600 !important; margin:5px 0 0 !important;
+  padding:0 !important;
+}
+
+/* ---------- Map fills the space ---------- */
+#mapWrap{ position:relative; }
+#map{ background:#20242a; }
+
+/* ---------- Open Now pill dropped — map is open-by-default now ---------- */
+/* "Open now" filter — left pill under Chains, matching the other shell pills.
+   .active = filtering to open (confirmed-closed hidden); inactive = showing all. */
+#openNowToggle{
+  position:static !important; align-self:flex-start !important;
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--shell-chrome) !important; color:var(--shell-ink) !important;
+  border:1px solid var(--shell-line) !important; border-radius:14px !important;
+  padding:6px 14px !important; font-size:14px !important; font-weight:800 !important;
+  box-shadow:var(--shell-shadow) !important; width:auto !important;
+  white-space:nowrap; cursor:pointer;
+}
+#openNowToggle.active{
+  background:#2e7d32 !important; border-color:#2e7d32 !important; color:#fff !important;
+}
+
+/* ---------- Right rail: Where Am I? (icon-only) + List ---------- */
+#whereAmIBtn{
+  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 90px) !important;
+  left:auto !important; bottom:auto !important; z-index:600 !important;
+  width:46px !important; height:46px !important; border-radius:14px !important;
+  background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
+  color:var(--shell-ink) !important; box-shadow:var(--shell-shadow) !important;
+  display:flex !important; align-items:center !important; justify-content:center !important; padding:0 !important;
+}
+#whereAmIBtn span{ display:none !important; }          /* icon-only */
+#whereAmIBtn .map-control-icon{ display:block !important; width:22px !important; height:22px !important; margin:0 !important; stroke:currentColor; fill:none; }
+
+#listViewToggle{
+  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 250px) !important;
+  left:auto !important; bottom:auto !important; z-index:600 !important;
+  width:46px !important; height:46px !important; border-radius:14px !important;
+  background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
+  color:var(--shell-ink) !important; box-shadow:var(--shell-shadow) !important;
+  font-size:0 !important;                                /* hide the "List" text, show icon */
+  padding:0 !important; display:grid !important; place-items:center !important;
+}
+#listViewToggle::before{ content:"📋"; font-size:20px; }
+
+/* ---------- Legend + Chains: bottom-left stack ---------- */
+#topLeftControls{
+  position:absolute !important; left:12px !important; top:54px !important; bottom:auto !important;
+  z-index:600 !important; display:flex; flex-direction:column; gap:10px; max-width:60%;
+}
+#legend, #chainFilter{
+  background:var(--shell-chrome) !important; border:1px solid var(--shell-line) !important;
+  border-radius:14px !important; box-shadow:var(--shell-shadow) !important; color:var(--shell-ink) !important;
+}
+#legendToggle, #chainFilterToggle{ color:var(--shell-ink) !important; font-weight:800 !important; font-size:14px !important; }
+#legendBody .dot{ border:1.5px solid #fff; }
+
+/* ---------- Bathroom Now: big teal bottom bar ---------- */
+#locateBtn{
+  position:fixed !important; left:12px !important; right:12px !important;
+  bottom:calc(env(safe-area-inset-bottom) + 18px) !important; top:auto !important;
+  z-index:650 !important; width:auto !important;
+  background:var(--accent) !important; color:var(--accent-ink) !important;
+  border:0 !important; border-radius:18px !important;
+  padding:15px 18px !important; font-size:17px !important; font-weight:900 !important;
+  letter-spacing:-.01em !important; text-align:left !important;
+  box-shadow:0 8px 26px color-mix(in srgb, var(--accent) 45%, transparent) !important;
+}
+#locateBtn:active{ background:var(--accent-deep) !important; }
+
+/* Bathroom Now result readout sits just above the bar */
+#nearestInfo{
+  position:fixed !important; left:12px !important; right:12px !important;
+  top:auto !important;                    /* release the old styles.css top:224px so the card hugs its content */
+  bottom:calc(env(safe-area-inset-bottom) + 82px) !important; z-index:640 !important;
+  max-width:none !important;              /* override old styles.css max-width:220px */
+  background:var(--shell-chrome) !important; color:var(--shell-ink) !important;
+  border:1px solid var(--shell-line) !important; border-radius:14px !important;
+  box-shadow:var(--shell-shadow) !important;
+}
+
+/* Fallback callout: shown when nothing in the selected chains is nearby */
+#nearestInfo .nearest-alert{
+  display:flex; gap:8px; align-items:flex-start;
+  margin:0 0 10px; padding:9px 11px;
+  background:color-mix(in srgb, var(--accent) 15%, transparent);
+  border-left:3px solid var(--accent);
+  border-radius:8px;
+  font-size:12.5px; font-weight:700; line-height:1.35; color:var(--shell-ink);
+}
+#nearestInfo .nearest-alert::before{ content:"ℹ️"; flex:none; }
+
+/* ---------- "Missing a location?" : slim pill, top-left ---------- */
+#missingBtn{
+  position:absolute !important; left:12px !important; right:auto !important;
+  top:12px !important; bottom:auto !important;
+  z-index:600 !important;
+  background:var(--shell-chrome) !important; color:var(--shell-muted) !important;
+  border:1px solid var(--shell-line) !important; border-radius:999px !important;
+  padding:8px 16px !important; font-size:14px !important; font-weight:700 !important;
+  box-shadow:var(--shell-shadow) !important; width:auto !important;
+}
+
+/* ---------- Community banner (Stage 1: static markup added in HTML) ---------- */
+#communityBanner{
+  position:fixed; left:12px; right:12px;
+  bottom:calc(env(safe-area-inset-bottom) + 82px); z-index:630;
+  display:flex; align-items:center; gap:10px;
+  background:var(--shell-chrome); border:1px solid var(--shell-line);
+  border-radius:14px; padding:10px 13px; box-shadow:var(--shell-shadow);
+}
+#communityBanner .cb-txt{ flex:1; min-width:0; font-size:12px; }
+#communityBanner .cb-txt b{ display:block; font-weight:800; color:var(--shell-ink); }
+#communityBanner .cb-txt small{ color:var(--shell-muted); }
+#communityBanner a{ color:var(--accent); font-weight:800; font-size:12.5px; text-decoration:none; white-space:nowrap; }
+#communityBanner .cb-close{ background:none; border:0; color:var(--shell-muted); font-size:18px; padding:0 4px; }
+
+/* ---------- Menu drawer ---------- */
+#drawerScrim{
+  position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:900;
+  opacity:0; pointer-events:none; transition:.22s;
+}
+#drawerScrim.open{ opacity:1; pointer-events:auto; }
+#appDrawer{
+  position:fixed; top:0; bottom:0; left:0; width:min(82%,340px); z-index:950;
+  background:var(--shell-chrome); border-right:1px solid var(--shell-line);
+  transform:translateX(-102%); transition:transform .24s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 16px);
+}
+#appDrawer.open{ transform:none; }
+#appDrawer .d-brand{ display:flex; align-items:center; gap:10px; padding:2px 18px 16px; border-bottom:1px solid var(--shell-line); }
+#appDrawer .d-brand img{ width:40px; height:40px; object-fit:contain; }
+#appDrawer .d-brand b{ font-size:16px; font-weight:900; letter-spacing:.02em; color:var(--shell-ink); font-family:var(--font-display); }
+#appDrawer .d-brand b .wm-accent{ color:var(--accent); }
+#appDrawer .d-items{ display:flex; flex-direction:column; padding:8px 0; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+/* All drawer rows share one left-aligned layout so icons + labels line up */
+#appDrawer .d-items button{
+  position:static !important; width:100% !important; display:flex !important; align-items:center;
+  gap:10px; background:transparent !important; border:0 !important; box-shadow:none !important;
+  color:var(--shell-ink) !important; font-size:15px !important; font-weight:700 !important;
+  padding:15px 20px !important; border-radius:0 !important; text-align:left !important;
+}
+#appDrawer .d-items button:active{ background:var(--shell-chrome2) !important; }
+/* Toggle rows (Show all locations, Appearance): switch pinned to the right */
+#appDrawer .d-toggle .d-switch{
+  margin-left:auto; width:42px; height:25px; border-radius:999px; background:var(--shell-chrome2);
+  border:1px solid var(--shell-line); position:relative; flex:none;
+}
+#appDrawer .d-toggle .d-switch b{ position:absolute; top:2px; left:2px; width:19px; height:19px;
+  border-radius:50%; background:var(--shell-muted); transition:.16s; }
+#appDrawer .d-toggle.on .d-switch{ background:color-mix(in srgb, var(--accent) 30%, transparent); }
+#appDrawer .d-toggle.on .d-switch b{ left:19px; background:var(--accent); }
+/* State caption under a toggle label */
+#appDrawer .d-sub{ display:block; font-size:12px; font-weight:500; color:var(--shell-muted); margin-top:3px; }
+#appDrawer .d-foot{ padding:14px 20px 0; border-top:1px solid var(--shell-line); color:var(--shell-muted); font-size:11px; }
+
+@media (prefers-reduced-motion: reduce){
+  #drawerScrim, #appDrawer{ transition:none; }
+}
+
+
+/* ---------- Leaflet zoom control: move to the right rail (clear of the bottom banner) + theme dark ---------- */
+.leaflet-control-zoom{
+  position:fixed !important; right:12px !important; top:calc(env(safe-area-inset-top) + 148px) !important;
+  bottom:auto !important; left:auto !important; z-index:600 !important;
+  width:46px !important; height:90px !important; margin:0 !important; box-sizing:border-box !important;
+  border:1px solid var(--shell-line) !important; border-radius:14px !important; overflow:hidden !important;
+  background:var(--shell-chrome) !important; box-shadow:var(--shell-shadow) !important;
+}
+.leaflet-control-zoom a{
+  background:var(--shell-chrome) !important; color:var(--shell-ink) !important;
+  width:100% !important; height:44px !important; line-height:44px !important; font-size:20px !important;
+  box-sizing:border-box !important; margin:0 !important; border:0 !important; border-radius:0 !important;
+}
+.leaflet-control-zoom a:first-child{ border-bottom:1px solid var(--shell-line) !important; }
+
+/* All three rail controls compute to the exact same 46px box so their edges line up. */
+#whereAmIBtn, #listViewToggle { box-sizing:border-box !important; }
+
+/* ---------- How Bathroom Report works (info page = About = Learn More) ---------- */
+#howItWorks.hiw-overlay{ position:fixed; inset:0; z-index:1000; display:none; background:rgba(4,10,18,.72); }
+#howItWorks.hiw-overlay.show{ display:flex; align-items:flex-end; }
+@media(min-width:640px){ #howItWorks.hiw-overlay.show{ align-items:center; justify-content:center; } }
+.hiw-card{ background:var(--shell-chrome); color:var(--shell-ink); width:100%; max-width:600px; max-height:92vh;
+  display:flex; flex-direction:column; border-radius:22px 22px 0 0; box-shadow:var(--shell-shadow); }
+@media(min-width:640px){ .hiw-card{ border-radius:20px; } }
+.hiw-head{ position:sticky; top:0; background:var(--shell-chrome); border-bottom:1px solid var(--shell-line);
+  padding:calc(env(safe-area-inset-top) + 16px) 18px 14px; display:flex; align-items:center; justify-content:space-between;
+  gap:12px; border-radius:22px 22px 0 0; }
+.hiw-head h2{ margin:0; font-size:19px; font-weight:900; letter-spacing:-.01em; }
+#howItWorksClose{ background:var(--shell-chrome2); border:0; color:var(--shell-ink); width:34px; height:34px; border-radius:10px; font-size:16px; }
+.hiw-body{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:6px 18px calc(env(safe-area-inset-bottom) + 24px); }
+.hiw-body section{ padding:15px 0; border-bottom:1px solid var(--shell-line); }
+.hiw-body section:last-of-type{ border-bottom:0; }
+.hiw-body h3{ margin:0 0 6px; font-size:14px; font-weight:800; color:var(--accent); }
+.hiw-body p{ margin:0 0 8px; font-size:13.5px; line-height:1.5; color:#d7dee6; }
+.hiw-body p:last-child{ margin-bottom:0; }
+.hiw-body a{ color:var(--accent); }
+.hiw-faq p{ margin-bottom:11px; }
+.hiw-faq b{ color:var(--shell-ink); }
+.hiw-support{ background:var(--shell-chrome2); border-radius:14px; padding:15px !important; border:0 !important; margin:8px 0; }
+.hiw-btn{ display:inline-flex; align-items:center; gap:9px; margin-top:10px; background:var(--accent); color:var(--accent-ink) !important;
+  font-weight:800; font-size:14px; padding:11px 18px; border-radius:12px; text-decoration:none; }
+.hiw-updated{ color:var(--shell-muted) !important; font-size:11.5px !important; text-align:center; margin-top:16px !important; }
+
+/* ---------- Key merged into Chains (the filter already shows color swatches) ---------- */
+#legend{ display:none !important; }
+
+
+/* ---------- Fixes: light-mode chain names, and List panel above the floating chips ---------- */
+/* The Chains panel is always dark, so force its text light in BOTH themes (was invisible in light mode). */
+#chainFilter, #chainFilter .chain-filter-row, #chainFilterBody, #legend, #legendBody { color:var(--shell-ink) !important; }
+
+/* The List panel must sit above the fixed right-rail chips... */
+#listViewPanel { z-index:900 !important; }
+/* ...and while it's open, hide the floating map controls entirely so nothing overlaps it. */
+body.list-open #whereAmIBtn,
+body.list-open #listViewToggle,
+body.list-open .leaflet-control-zoom,
+body.list-open #missingBtn,
+body.list-open #topLeftControls,
+body.list-open #locateBtn,
+body.list-open #communityBanner { display:none !important; }
+
+/* ---------- "We Missed One?" form: drop it right under its button (top-left), not the bottom ---------- */
+#missingPanel{
+  position:absolute !important; left:12px !important; top:56px !important;
+  right:auto !important; bottom:auto !important;
+  z-index:700 !important; width:min(82vw, 300px) !important;
+}
+
+/* ---------- Uniform vertical padding across the top pills ---------- */
+/* Chains/Key now match "We Missed One?" (#missingBtn) and "Log In" (#accountToggle) at 9px. */
+#chainFilter, #legend { padding:4px 13px !important; }
+#chainFilterToggle, #legendToggle { padding:0 !important; }
+
+/* Missing form: don't reserve empty space for the (blank) status note */
+#missingNote:empty { display:none !important; }
+
+
+/* ---------- Theme toggle relocated into the drawer (signed-in only) ---------- */
+/* Light/dark is a signed-in feature — hide the whole Appearance row when logged out. */
+body:not(.logged-in) #appDrawer #themeToggle{ display:none !important; }
+
+
+/* ---------- X + Cash App icon row in the FAQ / How-it-works page ---------- */
+.hiw-social-row{ display:flex; gap:14px; align-items:center; margin-top:6px; }
+.hiw-social-row a{ display:inline-flex; }
+.hiw-social-row img{ width:46px; height:46px; border-radius:12px; display:block; border:1px solid rgba(255,255,255,.12); }
+.hiw-social-row a:active{ opacity:.8; }
+
+
+.hiw-btn-icon{ width:22px; height:22px; border-radius:5px; display:block; }
+
+#appDrawer .d-count{ display:block; margin-top:10px; font-size:12px; font-weight:600; color:var(--shell-muted); opacity:1; letter-spacing:.02em; }
+#appDrawer .d-count:empty{ display:none; }
+#appDrawer .d-version{ display:block; margin-top:8px; font-size:11px; color:var(--shell-muted); opacity:.75; letter-spacing:.02em; }
+
+/* ---------- Rating flash overlay ---------- */
+/* Transient status/error is drawn OVER the stars so the rating card height never
+   changes; it fades back to the stars after a few seconds. */
+.rate-stack{ position:relative; }
+.rate-flash{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:0 10px; border-radius:8px;
+  background:var(--popup-bg, #ffffff); color:var(--shell-ink, #333);
+  font-weight:600; font-size:13px; line-height:1.3;
+  opacity:0; pointer-events:none; transition:opacity .3s ease;
+}
+.rate-flash.show{ opacity:1; pointer-events:auto; }
+.rate-flash.err{ color:#c62828; }
+@media (prefers-reduced-motion: reduce){ .rate-flash{ transition:none; } }
+
+/* ---------- Chains filter relocated into the hamburger drawer (signed-in only) ---------- */
+/* The chain filter used to be a floating map pill; it now lives inside #appDrawer as a
+   section. These rules strip the pill chrome and restyle it to match the drawer's rows.
+   Visibility is driven by app.js (syncChainFilterToAuth); this CSS also hard-hides it when
+   logged out so it never flashes before the auth state resolves. */
+body:not(.logged-in) #appDrawer #chainFilter{ display:none !important; }
+
+#appDrawer #chainFilter{
+  background:transparent !important; border:0 !important; border-top:1px solid var(--shell-line) !important;
+  border-radius:0 !important; box-shadow:none !important;
+  width:100% !important; max-width:none !important; margin:0 !important; padding:6px 0 !important;
+}
+#appDrawer #chainFilterToggle{
+  display:flex !important; align-items:center; gap:10px;
+  padding:15px 20px !important; margin:0 !important;
+  font-size:15px !important; font-weight:700 !important; color:var(--shell-ink) !important; cursor:pointer;
+}
+#appDrawer #chainFilterToggle #chainFilterArrow{ margin-left:auto; transition:transform .16s; }
+#appDrawer #chainFilterToggle:active{ background:var(--shell-chrome2); }
+
+#appDrawer #chainFilterBody{ margin:0 !important; padding:0 0 8px !important; }
+#appDrawer .chain-filter-row{
+  padding:11px 20px 11px 46px !important;     /* indent past the header's emoji so names line up */
+  gap:10px !important; font-size:15px !important; font-weight:600; white-space:normal;
+  color:var(--shell-ink) !important;
+}
+#appDrawer .chain-filter-row:active{ background:var(--shell-chrome2); }
+#appDrawer .chain-filter-row input{ width:18px; height:18px; flex:none; }
+#appDrawer .chain-filter-row .dot{ width:12px; height:12px; border-radius:50%; flex:none; border:1.5px solid #fff; }
+
+/* ---------- Directions-app preference (drawer, signed-in only) ---------- */
+/* Logged-out users get the device default automatically (Apple Maps on Apple, Google elsewhere),
+   so the manual picker is a signed-in feature — mirror the Chains section's hard-hide. */
+body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
+
+#appDrawer #navAppPref{
+  border-top:1px solid var(--shell-line); padding:12px 20px 14px;
+}
+#appDrawer .d-section-label{
+  font-size:15px; font-weight:700; color:var(--shell-ink); margin-bottom:10px;
+}
+/* Directions-app dropdown, themed to match the drawer (native select, styled control) */
+#appDrawer .nav-pref-select{
+  width:100%; padding:11px 12px; border-radius:12px; cursor:pointer;
+  background:var(--shell-chrome2); color:var(--shell-ink);
+  border:1px solid var(--shell-line); font-size:15px; font-weight:700;
+  -webkit-appearance:none; appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23f6f8fa' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat; background-position:right 12px center;
+}
+#appDrawer .nav-pref-select:focus{ outline:none; border-color:var(--accent); }
+/* "Select all chains" trigger at the top of the Chains list */
+#appDrawer .chain-all-btn{
+  display:block; width:calc(100% - 40px); margin:2px 20px 8px; padding:9px 12px;
+  border-radius:10px; cursor:pointer; text-align:center;
+  background:color-mix(in srgb, var(--accent) 16%, transparent);
+  color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  font-size:13.5px; font-weight:800;
+}
+#appDrawer .chain-all-btn:active{ opacity:.85; }
+#appDrawer .chain-all-btn:disabled{
+  background:transparent; color:var(--shell-muted);
+  border-color:var(--shell-line); cursor:default; font-weight:700;
+}
+
+/* ---------- Chain badge in the Bathroom Now card (below the callout, above the name) ---------- */
+#nearestInfo .now-chain-badge{
+  display:inline-block; margin:2px 0 6px; padding:3px 10px;
+  border-radius:999px; font-size:12px; font-weight:800; letter-spacing:.01em;
+  line-height:1.4; white-space:nowrap;
+}
+
+/* ---------- OSM-verified feature badges (distinct from community-confirmed) ---------- */
+/* Community-confirmed badges are green (styles.css). Verified-from-OpenStreetMap badges use
+   the accent/teal so the two sources read differently at a glance. */
+.feature-badge.verified{
+  background:color-mix(in srgb, var(--accent, #2ea1aa) 16%, transparent) !important;
+  border:1px solid color-mix(in srgb, var(--accent, #2ea1aa) 55%, transparent) !important;
+  color:var(--popup-text) !important;
+}
+
+/* ---------- Gas pump indicator beside the chain badge in the pin popup ---------- */
+.popup-head-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.gas-indicator{ font-size:15px; line-height:1; }
+
+/* ---------- Accessibility indicator in the pin popup head row ---------- */
+.access-indicator{ font-size:15px; line-height:1; }
+.access-indicator.community{ filter:none; }                 /* green-tier: community-confirmed */
+.access-indicator.verified{ opacity:.85; }                  /* teal-tier: OSM-verified */
