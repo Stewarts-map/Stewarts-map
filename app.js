@@ -593,21 +593,45 @@ function accessibleBadgeHtml(locId){
   return '';
 }
 
+// Community data now comes from ONE aggregate-doc read per popup open (the Cloud Function
+// maintains per-amenity answer tallies in aggregates/{locId}.amen). Constant cost regardless of
+// how many people voted — replaces the old scan of every vote doc at the location (2 queries).
+// A short TTL lets the popup's separate sub-loads (ratings, amenities, store features) share a
+// single fetch; post-vote refreshes within the TTL render the optimistic local bump instead.
+const communityFetchCache = {};   // locId -> { ts, promise }
+const COMMUNITY_TTL_MS = 15000;
+function fetchCommunityDoc(locId){
+  const hit = communityFetchCache[locId];
+  const now = Date.now();
+  if(hit && now - hit.ts < COMMUNITY_TTL_MS) return hit.promise;
+  const promise = (async () => {
+    let data = {};
+    try{
+      const {db, doc, getDoc} = await fb();
+      const snap = await getDoc(doc(db, 'aggregates', locId));
+      data = snap.exists() ? (snap.data() || {}) : {};
+    }catch(e){ console.error('community doc load failed', e); }
+    const amen = data.amen || {};
+    const build = defs => {
+      const s = {};
+      defs.forEach(a => {
+        const c = amen[a.key] || {};
+        s[a.key] = { yes: c.yes > 0 ? c.yes : 0, no: c.no > 0 ? c.no : 0 };
+      });
+      return s;
+    };
+    amenityCache[locId] = build(BATHROOM_AMENITIES);
+    storeFeatureCache[locId] = build(STORE_FEATURES);
+    return data;
+  })();
+  communityFetchCache[locId] = { ts: now, promise };
+  return promise;
+}
+
 async function loadAmenitySummary(locId){
   try{
-    const {db, collection, query, where, getDocs} = await fb();
-    const snap = await getDocs(query(collection(db, 'votes'), where('locId', '==', locId)));
-    const summary = {};
-    BATHROOM_AMENITIES.forEach(a => summary[a.key] = {yes:0,no:0});
-    snap.forEach(d => {
-      const amenities = d.data().amenities || {};
-      BATHROOM_AMENITIES.forEach(a => {
-        if(amenities[a.key] === 'yes') summary[a.key].yes++;
-        if(amenities[a.key] === 'no') summary[a.key].no++;
-      });
-    });
-    amenityCache[locId] = summary;
-    return summary;
+    await fetchCommunityDoc(locId);
+    return amenityCache[locId];
   }catch(e){ console.error('loadAmenitySummary failed', e); return null; }
 }
 
@@ -661,19 +685,8 @@ function storeFeatureSummaryHtml(summary, loc){
 
 async function loadStoreFeatureSummary(locId){
   try{
-    const {db, collection, query, where, getDocs} = await fb();
-    const snap = await getDocs(query(collection(db, 'votes'), where('locId', '==', locId)));
-    const summary = {};
-    STORE_FEATURES.forEach(a => summary[a.key] = {yes:0,no:0});
-    snap.forEach(d => {
-      const features = d.data().storeFeatures || {};
-      STORE_FEATURES.forEach(a => {
-        if(features[a.key] === 'yes') summary[a.key].yes++;
-        if(features[a.key] === 'no') summary[a.key].no++;
-      });
-    });
-    storeFeatureCache[locId] = summary;
-    return summary;
+    await fetchCommunityDoc(locId);
+    return storeFeatureCache[locId];
   }catch(e){ console.error('loadStoreFeatureSummary failed', e); return null; }
 }
 
@@ -879,6 +892,11 @@ async function saveMyVote(id, data){
     const clientId = getEffectiveId();
     const existing = myVoteCache[id] || {};
     const payload = { ...data, clientId, locId: id, lastUpdated: Date.now() };
+    // Username on the vote lets the leaderboard Cloud Function credit ratings to a display name
+    // without a separate lookup. Only logged-in users can rate, so this is always present.
+    const uname = (window.__currentUser && window.__currentUser.email)
+      ? window.__currentUser.email.split('@')[0] : '';
+    if(uname) payload.username = uname;
     // First bathroom rating gets an immutable ratedAt — drives the time-based achievements.
     if(data.bathroom > 0 && !existing.ratedAt){
       payload.ratedAt = Date.now();
@@ -1123,10 +1141,11 @@ function addMarker(loc){
     // On-demand: load just THIS location's aggregate (replaces the old bulk read of every
     // aggregate). One getDoc per opened popup, then refresh the popup content once.
     try{
-      const {db, doc, getDoc} = await fb();
-      const snap = await getDoc(doc(db, 'aggregates', loc.id));
-      if(snap.exists()){
-        ratingsCache[loc.id] = { ...emptyAgg(), ...snap.data() };
+      // Shared fetch: ratings + amenity tallies + store-feature tallies all come from this one
+      // aggregate-doc read (fetchCommunityDoc also fills amenityCache/storeFeatureCache).
+      const data = await fetchCommunityDoc(loc.id);
+      if(data && Object.keys(data).length){
+        ratingsCache[loc.id] = { ...emptyAgg(), ...data };
         if(marker.isPopupOpen()) marker.setPopupContent(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]));
       }
     }catch(e){ /* non-fatal — popup shows the placeholder rating until next open */ }
@@ -1444,6 +1463,16 @@ async function attachAmenityHandlers(loc){
         updatedVote.storeFeatures = { ...(myVote.storeFeatures || {}), [key]: value };
       }
       if(meta[key]){ meta[key] = { notSure: 0 }; updatedVote.amenityMeta = meta; }
+      // Optimistic local tally: the server-side aggregate updates a beat later (Cloud Function),
+      // so bump the cached counts now so this answer shows in the confirmed block immediately.
+      const cache = bathroom ? amenityCache : storeFeatureCache;
+      const s = cache[loc.id] = cache[loc.id] || {};
+      const cell = s[key] = s[key] || { yes: 0, no: 0 };
+      const prevAns = bathroom ? (myVote.amenities || {})[key] : (myVote.storeFeatures || {})[key];
+      if(prevAns === 'yes' && cell.yes > 0) cell.yes--;
+      if(prevAns === 'no'  && cell.no  > 0) cell.no--;
+      if(value === 'yes') cell.yes++;
+      if(value === 'no')  cell.no++;
     }
     myVoteCache[loc.id] = updatedVote;
 
@@ -1728,6 +1757,55 @@ async function saveStoredAchievements(achievements){
   }
 }
 
+// ---- Leaderboard ("Top Reviewers") — 2 reads total: the top-10 doc + your own userStats doc.
+// Both maintained server-side by the Cloud Function, so cost is constant regardless of user count.
+let _leaderboardLoaded = false;
+async function loadLeaderboard(){
+  const listEl = document.getElementById('leaderboardList');
+  const youEl = document.getElementById('leaderboardYou');
+  if(!listEl) return;
+  if(_leaderboardLoaded) return;           // once per session
+  _leaderboardLoaded = true;
+  try{
+    const {db, doc, getDoc} = await fb();
+    const snap = await getDoc(doc(db, 'leaderboard', 'top'));   // 1 read: whole board
+    const top = (snap.exists() && Array.isArray(snap.data().top)) ? snap.data().top : [];
+    if(!top.length){
+      listEl.innerHTML = '<div class="lb-empty">No ratings yet — be the first to make the board.</div>';
+      if(youEl) youEl.textContent = '';
+      return;
+    }
+    const medal = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+    const myUid = getEffectiveId();
+    listEl.innerHTML = top.map((e, i) => {
+      const mine = e.uid === myUid ? ' lb-mine' : '';
+      const n = esc(e.username || 'anon');
+      const cnt = e.count === 1 ? '1 rating' : `${e.count} ratings`;
+      return `<div class="lb-row${mine}"><span class="lb-rank">${medal(i)}</span><span class="lb-name">${n}</span><span class="lb-count">${cnt}</span></div>`;
+    }).join('');
+
+    // Your own rank line — only if logged in and NOT already visible in the top 10.
+    if(youEl){
+      youEl.textContent = '';
+      if(isLoggedIn() && !top.some(e => e.uid === myUid)){
+        try{
+          const meSnap = await getDoc(doc(db, 'userStats', myUid));   // 1 read: your rank
+          if(meSnap.exists()){
+            const me = meSnap.data();
+            if(me && me.count > 0){
+              const cnt = me.count === 1 ? '1 rating' : `${me.count} ratings`;
+              youEl.innerHTML = `<div class="lb-row lb-mine lb-you"><span class="lb-rank">You</span><span class="lb-name">${esc(me.username||'')}</span><span class="lb-count">${cnt}</span></div>`;
+            }
+          }
+        }catch(e){/* your-rank is a nice-to-have; skip on failure */}
+      }
+    }
+  }catch(e){
+    _leaderboardLoaded = false;   // allow retry
+    if(listEl) listEl.innerHTML = '<div class="lb-empty">Leaderboard unavailable right now.</div>';
+  }
+}
+
 function showAchievementToast(def){
   const toast = document.createElement('div');
   toast.className = 'achievement-toast';
@@ -1849,27 +1927,38 @@ function refreshStatTicker(){
 }
 
 // Highlights whichever location was rated most recently, anywhere on the map
-function updateMostRecentBadge(){
+// Shows the genuinely most-recently-rated location ANYWHERE (not just pins loaded this session).
+// One cheap query — activity where type=='rating', newest first, limit 1 — so it reflects real
+// site-wide activity on page load and signals the app is alive. Cached for the session.
+let _mostRecentLoaded = false;
+async function updateMostRecentBadge(){
   const el = document.getElementById('mostRecentBadge');
-  if(!el) return;
-  let mostRecentLoc = null;
-  let mostRecentTs = 0;
-  seedLocations.forEach(loc => {
-    const agg = ratingsCache[loc.id];
-    if(agg && agg.lastUpdated && agg.lastUpdated > mostRecentTs){
-      mostRecentTs = agg.lastUpdated;
-      mostRecentLoc = loc;
-    }
-  });
-  if(!mostRecentLoc){
-    el.textContent = '';
-    el.onclick = null;
+  if(!el || _mostRecentLoaded) return;
+  _mostRecentLoaded = true;
+  try{
+    const {db, collection, query, where, orderBy, limit, getDocs} = await fb();
+    const snap = await getDocs(query(
+      collection(db, 'activity'),
+      where('type', '==', 'rating'),
+      orderBy('ts', 'desc'),
+      limit(1)
+    ));
+    let rec = null;
+    snap.forEach(d => rec = d.data());
+    if(!rec || !rec.locId){ el.textContent = ''; refreshStatTicker(); return; }
+    const loc = locationsById[rec.locId];
+    const name = (loc && loc.n) || 'a bathroom';
+    el.textContent = `🕐 Most recently rated: ${name} — ${relativeTimeFromNow(rec.ts)}`;
+    if(loc && markers[loc.id]) el.onclick = () => zoomToMarker(markers[loc.id]);
     refreshStatTicker();
-    return;
+  }catch(e){
+    // Ordered query needs a composite index (type + ts); if it's missing or the query fails,
+    // just leave the badge empty rather than break the ticker. (Create the index in the Firebase
+    // console link that appears in the console error, one-time.)
+    _mostRecentLoaded = false;   // allow a retry next call
+    el.textContent = '';
+    refreshStatTicker();
   }
-  el.textContent = `🕐 Most recently rated: ${mostRecentLoc.n} — ${relativeTimeFromNow(mostRecentTs)}`;
-  el.onclick = () => zoomToMarker(markers[mostRecentLoc.id]);
-  refreshStatTicker();
 }
 
 // Verified visit — requires being physically near a location before rating it
@@ -2646,6 +2735,7 @@ function openAccountPanel(mode){
   updateAccountUI(isPassport);
   checkAndUnlockAchievements();
   if(isPassport){
+    loadLeaderboard();
     requestAnimationFrame(() => {
       const p = document.getElementById('passportSection');
       if(p) p.scrollIntoView({ block: 'start' });
@@ -2696,6 +2786,7 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
   if(result.ok){
     note.style.color = '#4caf50';
     note.textContent = 'Logged in!';
+    _leaderboardLoaded = false;   // re-fetch so the board reflects the logged-in user
     updateAccountUI();
     loadAllRatings();
   } else {
@@ -2707,6 +2798,7 @@ document.getElementById('authLogInBtn').addEventListener('click', async () => {
 
 document.getElementById('logOutBtn').addEventListener('click', async () => {
   await logOutAccount();
+  _leaderboardLoaded = false;   // re-fetch; drops the "you" row
   updateAccountUI();
   loadAllRatings();
   document.getElementById('authNote').textContent = '';

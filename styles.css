@@ -567,3 +567,13 @@
   }
 
 .popup-inner .addr.addr-title{ font-weight:700; font-size:15px; color:var(--popup-text); margin-top:6px; }
+
+  /* Leaderboard — Top Reviewers */
+  #leaderboardSection{margin-top:18px;}
+  .lb-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;margin-bottom:4px;background:rgba(255,255,255,.03);}
+  .lb-row.lb-mine{background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.3);}
+  .lb-rank{flex:none;width:34px;font-weight:800;font-size:14px;color:var(--amber);text-align:center;}
+  .lb-name{flex:1;font-weight:700;color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lb-count{flex:none;font-size:12.5px;color:var(--muted);font-weight:600;}
+  .lb-you{margin-top:6px;border-top:1px dashed rgba(255,255,255,.15);}
+  .lb-empty{padding:10px;color:var(--muted);font-size:13px;text-align:center;}
