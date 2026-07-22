@@ -314,8 +314,9 @@ const amenityCache = {};
 // myVote.amenities), tucked inside the already-collapsed Store rating section so the
 // bathroom-first flow stays exactly as quick as it was.
 const STORE_FEATURES = [
-  {key:'gas', label:'Gas & Diesel', stateIcons:{yes:'⛽'}},
   {key:'evCharging', label:'EV Charging', stateIcons:{yes:'⚡'}},
+  {key:'airPump', label:'Air pump', stateIcons:{yes:'🛞'}},
+  {key:'shower', label:'Showers', stateIcons:{yes:'🚿'}},
   {key:'indoorSeating', label:'Indoor seating', stateIcons:{yes:'🪑'}},
   {key:'wifi', label:'WiFi', stateIcons:{yes:'📶'}}
 ];
@@ -363,14 +364,34 @@ function amenityEditorHtml(locId, myVote){
   </div>`;
 }
 
-function amenitySummaryHtml(summary){
-  if(!summary) return '<span class="feature-badge unconfirmed">Loading features…</span>';
+// Badges for features OSM verifies but the community hasn't confirmed yet. `skip` lets the
+// caller exclude a key that's already shown elsewhere (e.g. accessible has its own big badge).
+function osmVerifiedBadges(loc, featureDefs, communitySummary, skip){
+  const osm = (loc && loc.osm) || {};
+  const conf = (loc && loc.conf) || {};
+  return featureDefs.filter(a => {
+    if(skip && skip.includes(a.key)) return false;
+    if(!osm[a.key]) return false;
+    if(conf[a.key]) return false;   // community-baked confirmation wins (shown green elsewhere)
+    const x = communitySummary && communitySummary[a.key];
+    const communityConfirmed = x && x.yes >= 2 && x.yes > x.no;   // don't duplicate a confirmed badge
+    return !communityConfirmed;
+  }).map(a => `<span class="feature-badge verified">${amenityAnswerIcon(a, 'yes')} ${a.label} ✓</span>`).join('');
+}
+
+function amenitySummaryHtml(summary, loc){
+  const conf = (loc && loc.conf) || {};
   const confirmed = BATHROOM_AMENITIES.filter(a => {
-    const x = summary[a.key] || {yes:0,no:0};
-    return x.yes >= 2 && x.yes > x.no;
+    const x = summary && summary[a.key] || {yes:0,no:0};
+    return (x.yes >= 2 && x.yes > x.no) || conf[a.key];   // live votes OR baked community confirmation
   });
-  if(!confirmed.length) return '<span class="feature-badge unconfirmed">No features confirmed yet</span>';
-  return confirmed.map(a => `<span class="feature-badge">${amenityAnswerIcon(a, 'yes')} ${a.label}</span>`).join('');
+  // 'accessible' is shown by its own prominent badge, so exclude it here to avoid duplication.
+  const verified = osmVerifiedBadges(loc, BATHROOM_AMENITIES, summary, ['accessible']);
+  const communityBadges = confirmed.map(a => `<span class="feature-badge">${amenityAnswerIcon(a, 'yes')} ${a.label}</span>`).join('');
+  const all = communityBadges + verified;
+  if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
+  if(!all) return '<span class="feature-badge unconfirmed">No features confirmed yet</span>';
+  return all;
 }
 
 // Same "confirmed" rule as the summary badges (at least 2 yes-votes, and more yes than no),
@@ -382,11 +403,39 @@ function isConfirmedAccessible(summary){
   return x.yes >= 2 && x.yes > x.no;
 }
 
-function accessibleBadgeHtml(locId){
+// Compact head-row ♿ indicator (sits next to the chain badge / gas icon so accessibility is
+// visible at a glance without scrolling to the feature badges). Mirrors accessibleBadgeHtml's
+// signal priority: community confirmation (green) outranks OSM-verified (teal). Empty when unknown.
+function accessIndicatorHtml(locId){
+  const loc = locationsById[locId];
+  if(!loc) return '';
   const summary = amenityCache[locId];
-  if(!summary) return ''; // not loaded yet — attachAmenityHandlers fills this in once it is
-  if(!isConfirmedAccessible(summary)) return '';
-  return '<div class="accessible-badge">♿ Handicap accessible — confirmed by visitors</div>';
+  const communityYes = (summary && isConfirmedAccessible(summary)) || (loc.conf && loc.conf.accessible);
+  const osmYes = (loc.osm && loc.osm.accessible) || loc.wheelchair === 'yes' || loc.wheelchair === 'designated';
+  if(!communityYes && !osmYes) return '';
+  const cls = communityYes ? 'access-indicator community' : 'access-indicator verified';
+  const title = communityYes ? 'Wheelchair accessible — confirmed by visitors' : 'Wheelchair accessible — verified';
+  return `<span class="${cls}" title="${title}" aria-label="${title}">♿</span>`;
+}
+
+function accessibleBadgeHtml(locId){
+  // Community confirmations are the strongest signal and win when present.
+  const summary = amenityCache[locId];
+  if(summary && isConfirmedAccessible(summary)){
+    return '<div class="accessible-badge">♿ Handicap accessible — confirmed by visitors</div>';
+  }
+  const loc = locationsById[locId];
+  // Baked community confirmation (from a prior votes bake) also counts as visitor-confirmed.
+  if(loc && loc.conf && loc.conf.accessible){
+    return '<div class="accessible-badge">♿ Handicap accessible — confirmed by visitors</div>';
+  }
+  // Fall back to accessibility data baked into the location files (sourced from
+  // OpenStreetMap wheelchair / toilets:wheelchair tags at bake time).
+  const osmAccessible = loc && ((loc.osm && loc.osm.accessible) || loc.wheelchair === 'yes' || loc.wheelchair === 'designated');
+  if(osmAccessible){
+    return '<div class="accessible-badge">♿ Wheelchair accessible — verified</div>';
+  }
+  return '';
 }
 
 async function loadAmenitySummary(locId){
@@ -433,14 +482,17 @@ function storeFeatureEditorHtml(locId, myVote){
   </div>`;
 }
 
-function storeFeatureSummaryHtml(summary){
-  if(!summary) return '<span class="feature-badge unconfirmed">Loading features…</span>';
+function storeFeatureSummaryHtml(summary, loc){
+  const conf = (loc && loc.conf) || {};
   const confirmed = STORE_FEATURES.filter(a => {
-    const x = summary[a.key] || {yes:0,no:0};
-    return x.yes >= 2 && x.yes > x.no;
+    const x = summary && summary[a.key] || {yes:0,no:0};
+    return (x.yes >= 2 && x.yes > x.no) || conf[a.key];
   });
-  if(!confirmed.length) return '<span class="feature-badge unconfirmed">No features confirmed yet</span>';
-  return confirmed.map(a => `<span class="feature-badge">${amenityAnswerIcon(a, 'yes')} ${a.label}</span>`).join('');
+  const verified = osmVerifiedBadges(loc, STORE_FEATURES, summary);
+  const all = confirmed.map(a => `<span class="feature-badge">${amenityAnswerIcon(a, 'yes')} ${a.label}</span>`).join('') + verified;
+  if(!summary && !verified) return '<span class="feature-badge unconfirmed">Loading features…</span>';
+  if(!all) return '<span class="feature-badge unconfirmed">No features confirmed yet</span>';
+  return all;
 }
 
 async function loadStoreFeatureSummary(locId){
@@ -778,11 +830,16 @@ function popupHtml(loc, agg, myVote){
   } else {
     hoursLine = `<div class="hours-line">🕐 Hours not listed for this store yet — know them? Tap 🚩 below to send them in.</div>`;
   }
-  const recency = relativeTimeFromNow(agg.lastUpdated);
+  const recency = relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated);
   const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   const chain = chainFor(loc);
+  const gasIcon = (loc.osm && loc.osm.gas) ? '<span class="gas-indicator" title="Gas &amp; diesel available">⛽</span>' : '';
   return `<div class="popup-inner" data-locid="${loc.id}">
-    <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
+    <div class="popup-head-row">
+      <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${chain.name}</div>
+      ${gasIcon}
+      <span id="access-indicator-${loc.id}">${accessIndicatorHtml(loc.id)}</span>
+    </div>
     <div class="addr addr-title">${loc.addr}${loc.num ? ' &middot; Shop #' + loc.num : ''}</div>
     ${hoursLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
@@ -824,7 +881,8 @@ function popupHtml(loc, agg, myVote){
         <button class="btn btn-amber tip-submit" id="tip-submit-${loc.id}">Add</button>
       </div>
     </div>
-    <div class="feature-summary"><div class="feature-title">🚻 Confirmed bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id])}</div></div>
+    <div class="feature-summary"><div class="feature-title">🚻 Confirmed bathroom features</div><div class="feature-badges" id="feature-summary-${loc.id}">${amenitySummaryHtml(amenityCache[loc.id], loc)}</div></div>
+    <div class="feature-summary"><div class="feature-title">🏪 Confirmed store features</div><div class="feature-badges" id="store-feature-summary-${loc.id}">${storeFeatureSummaryHtml(storeFeatureCache[loc.id], loc)}</div></div>
     ${amenityEditorHtml(loc.id, myVote)}` : `<div class="popup-signin-hint">🔒 Sign in to rate this bathroom and see visitor tips.</div>`}
   </div>`;
 }
@@ -851,7 +909,10 @@ function addMarker(loc){
   // pins are on the map. It renders only markers within the current viewport (plus the
   // chain and open-now filters), so the ~3,000 off-screen pins stay out of the DOM. This
   // is the main win for load speed and map responsiveness as the dataset grows nationally.
-  marker.bindPopup(popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]), {
+  // Lazy content: Leaflet accepts a function evaluated on open. Building the full popup HTML
+  // for all 5,500+ locations at startup cost real CPU and ~megabytes of strings; now each
+  // popup renders only when its pin is actually tapped (popupopen refreshes it again anyway).
+  marker.bindPopup(() => popupHtml(loc, ratingsCache[loc.id], myVoteCache[loc.id]), {
     maxWidth: Math.min(280, window.innerWidth - 40),
     maxHeight: window.innerHeight * 0.6,
     autoPan: false,
@@ -883,6 +944,7 @@ function addMarker(loc){
     safeAttach(attachShareHandler);
     safeAttach(attachReportHandler);
     safeAttach(attachAmenityHandlers);
+    safeAttach(attachStoreFeatureHandlers);
   });
   markers[loc.id] = marker;
 }
@@ -1075,9 +1137,11 @@ function attachReportHandler(loc){
 async function attachAmenityHandlers(loc){
   const summaryEl=document.getElementById('feature-summary-'+loc.id);
   const summary=await loadAmenitySummary(loc.id);
-  if(summaryEl) summaryEl.innerHTML=amenitySummaryHtml(summary);
+  if(summaryEl) summaryEl.innerHTML=amenitySummaryHtml(summary, loc);
   const badgeEl = document.getElementById('accessible-badge-' + loc.id);
   if(badgeEl) badgeEl.innerHTML = accessibleBadgeHtml(loc.id);
+  const accEl = document.getElementById('access-indicator-' + loc.id);
+  if(accEl) accEl.innerHTML = accessIndicatorHtml(loc.id);
 
   const stepOrig = document.getElementById('amenity-step-' + loc.id);
   if(!stepOrig) return;
@@ -1124,14 +1188,14 @@ async function attachAmenityHandlers(loc){
     stepEl.innerHTML = renderAmenityStepHtml(updatedVote);
 
     const fresh = await loadAmenitySummary(loc.id);
-    if(summaryEl) summaryEl.innerHTML = amenitySummaryHtml(fresh);
+    if(summaryEl) summaryEl.innerHTML = amenitySummaryHtml(fresh, loc);
   });
 }
 
 async function attachStoreFeatureHandlers(loc){
   const summaryEl=document.getElementById('store-feature-summary-'+loc.id);
   const summary=await loadStoreFeatureSummary(loc.id);
-  if(summaryEl) summaryEl.innerHTML=storeFeatureSummaryHtml(summary);
+  if(summaryEl) summaryEl.innerHTML=storeFeatureSummaryHtml(summary, loc);
 
   const stepOrig = document.getElementById('store-feature-step-' + loc.id);
   if(!stepOrig) return;
@@ -1174,7 +1238,7 @@ async function attachStoreFeatureHandlers(loc){
     stepEl.innerHTML = renderStoreFeatureStepHtml(updatedVote);
 
     const fresh = await loadStoreFeatureSummary(loc.id);
-    if(summaryEl) summaryEl.innerHTML = storeFeatureSummaryHtml(fresh);
+    if(summaryEl) summaryEl.innerHTML = storeFeatureSummaryHtml(fresh, loc);
   });
 }
 
@@ -1896,6 +1960,22 @@ function relativeTimeFromNow(ts){
 }
 
 let showAllLocations = false; // map hides confirmed-closed by default; the ☰ "Show all" toggle flips this
+let hideInaccessible = false;  // opt-in: when true, hide only pins CONFIRMED not wheelchair-accessible
+
+// A location counts as "confirmed not accessible" only when there's a negative signal AND no
+// positive one. Unknown/untagged locations are never hidden — absence of data is not evidence of
+// inaccessibility. All signals are baked (zero Firestore reads), so this is safe to run over every
+// visible pin in applyFilters.
+function isConfirmedNotAccessible(loc){
+  const yes = (loc.conf && loc.conf.accessible)
+    || (loc.osm && loc.osm.accessible)
+    || loc.wheelchair === 'yes' || loc.wheelchair === 'designated';
+  if(yes) return false;                                   // any positive confirmation keeps it visible
+  const no = (loc.confNo && loc.confNo.accessible)        // community-confirmed no
+    || (loc.osm && loc.osm.accessibleNo)                  // OSM wheelchair=no
+    || loc.wheelchair === 'no';                           // legacy baked no
+  return !!no;
+}
 
 // How far beyond the visible map edges to still render pins, as a fraction of the
 // viewport, so a small pan doesn't leave blank areas while new pins load in.
@@ -1916,10 +1996,11 @@ function applyFilters(){
     const loc = m.locationData;
     if(!loc) return;
     const openOk = showAllLocations || isLocationOpenNow(loc) !== false; // hide only confirmed-closed; unknown stays visible
+    const accessOk = !hideInaccessible || !isConfirmedNotAccessible(loc); // hide only confirmed-inaccessible; unknown stays visible
     const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
     const inView = bounds.contains(m.getLatLng());
     const popupOpen = m.isPopupOpen && m.isPopupOpen();
-    if((openOk && chainOk && inView) || popupOpen){
+    if((openOk && accessOk && chainOk && inView) || popupOpen){
       if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
     } else {
       if(markerCluster.hasLayer(m)) markerCluster.removeLayer(m);
@@ -2075,6 +2156,24 @@ renderNavPref();
   sync();
   t.addEventListener('click', () => {
     showAllLocations = !showAllLocations;
+    sync();
+    applyFilters();
+  });
+})();
+
+// Accessibility filter — a drawer switch. Off by default. When on, hides ONLY pins confirmed
+// not wheelchair-accessible (community-confirmed no, OSM wheelchair=no, or legacy baked no).
+// Locations with unknown accessibility always stay visible, since they may well be accessible.
+(function(){
+  const t = document.getElementById('accessibleToggle');
+  if(!t) return;
+  const sync = () => {
+    t.classList.toggle('on', hideInaccessible);
+    t.setAttribute('aria-pressed', String(hideInaccessible));
+  };
+  sync();
+  t.addEventListener('click', () => {
+    hideInaccessible = !hideInaccessible;
     sync();
     applyFilters();
   });
@@ -2241,20 +2340,8 @@ async function getDrivingOptions(user,candidates){
   const data=await response.json();
   return candidates.map((loc,i)=>({loc,distanceMiles:data.distances?.[0]?.[i+1]/1609.344,durationMinutes:data.durations?.[0]?.[i+1]/60})).filter(x=>Number.isFinite(x.distanceMiles));
 }
-// Compact "3 days ago" style relative time. Returns '' for missing/invalid input.
-function timeAgo(ts){
-  const t = typeof ts === 'number' ? ts : Date.parse(ts);
-  if(!Number.isFinite(t)) return '';
-  const s = Math.floor((Date.now() - t) / 1000);
-  if(s < 0) return 'just now';
-  if(s < 60) return 'just now';
-  const m = Math.floor(s/60);      if(m < 60) return `${m} min ago`;
-  const h = Math.floor(m/60);      if(h < 24) return `${h} hour${h===1?'':'s'} ago`;
-  const d = Math.floor(h/24);      if(d < 30) return `${d} day${d===1?'':'s'} ago`;
-  const mo = Math.floor(d/30);     if(mo < 12) return `${mo} month${mo===1?'':'s'} ago`;
-  const y = Math.floor(d/365);     return `${y} year${y===1?'':'s'} ago`;
-}
-
+// Compact "3 days ago" style relative time for the Bathroom Now card — shares
+// relativeTimeFromNow with the pin popup so both surfaces always agree.
 function bathroomNowCard(result,fallback=false){
   const agg=ratingsCache[result.loc.id]||emptyAgg(); const open=isLocationOpenNow(result.loc);
   // Driving distance is trustworthy; the straight-line fallback is not (5 mi as-the-crow can be 40 by road),
@@ -2269,7 +2356,7 @@ function bathroomNowCard(result,fallback=false){
   }
   const duration=(!fallback && Number.isFinite(result.durationMinutes))?` · ${Math.round(result.durationMinutes)} min`:'';
   // "Last rated" shows only when the aggregate actually carries a timestamp — no field, no line (never fabricated).
-  const ratedWhen = agg.bathroomCount>0 ? timeAgo(agg.lastRatedAt) : '';
+  const ratedWhen = agg.bathroomCount>0 ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
   const lastRatedNote = ratedWhen ? ` · rated ${ratedWhen}` : '';
   const hoursMissingNote=open===null?'<br><small>No hours listed for this store — tap "View pin" then 🚩 to send them in.</small>':'';
   const outsideSelection=!activeChains.has(result.loc.chain || DEFAULT_CHAIN_KEY);

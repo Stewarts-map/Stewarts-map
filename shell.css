@@ -417,3 +417,21 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   border-radius:999px; font-size:12px; font-weight:800; letter-spacing:.01em;
   line-height:1.4; white-space:nowrap;
 }
+
+/* ---------- OSM-verified feature badges (distinct from community-confirmed) ---------- */
+/* Community-confirmed badges are green (styles.css). Verified-from-OpenStreetMap badges use
+   the accent/teal so the two sources read differently at a glance. */
+.feature-badge.verified{
+  background:color-mix(in srgb, var(--accent, #2ea1aa) 16%, transparent) !important;
+  border:1px solid color-mix(in srgb, var(--accent, #2ea1aa) 55%, transparent) !important;
+  color:var(--popup-text) !important;
+}
+
+/* ---------- Gas pump indicator beside the chain badge in the pin popup ---------- */
+.popup-head-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.gas-indicator{ font-size:15px; line-height:1; }
+
+/* ---------- Accessibility indicator in the pin popup head row ---------- */
+.access-indicator{ font-size:15px; line-height:1; }
+.access-indicator.community{ filter:none; }                 /* green-tier: community-confirmed */
+.access-indicator.verified{ opacity:.85; }                  /* teal-tier: OSM-verified */

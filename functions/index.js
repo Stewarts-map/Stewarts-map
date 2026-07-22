@@ -30,5 +30,8 @@ exports.recomputeBathroomAggregate = onDocumentWritten('votes/{voteId}', async (
     bathroomSum:   FieldValue.increment(sumDelta),
     bathroomCount: FieldValue.increment(countDelta),
     lastUpdated:   Date.now(),
+    // Stamp only when the new state includes a real rating (not on rating removal), so the
+    // client's "rated X ago" line reflects the most recent actual rating.
+    ...(a > 0 ? { lastRatedAt: Date.now() } : {}),
   }, {merge: true});
 });
