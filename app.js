@@ -1662,9 +1662,9 @@ const ACHIEVEMENT_DEFS = [
     calc:s=>({done:s.totalChains>0&&s.chainCount>=s.totalChains,current:s.chainCount,total:s.totalChains||1})},
   { key:'brandLoyalist', icon:'🏷️', name:'Brand Loyalist', desc:'Rate 10 locations of a single chain',
     calc:s=>({done:s.maxOneChain>=10,current:Math.min(s.maxOneChain,10),total:10})},
-  { key:'critic', icon:'⭐', name:'Critic', desc:'Give a 5-star rating',
+  { key:'critic', icon:'⭐', name:'Critic', desc:'Give a 5-star rating', hidden:true,
     calc:s=>({done:s.fiveStarCount>=1,current:Math.min(s.fiveStarCount,1),total:1})},
-  { key:'toughCrowd', icon:'💢', name:'Tough Crowd', desc:'Give a 1-star rating',
+  { key:'toughCrowd', icon:'💢', name:'Tough Crowd', desc:'Give a 1-star rating', hidden:true,
     calc:s=>({done:s.oneStarCount>=1,current:Math.min(s.oneStarCount,1),total:1})},
   { key:'hiddenGemHunter', icon:'💎', name:'Hidden Gem Hunter', desc:'Rate a spot that had fewer than 5 reviews',
     calc:s=>({done:s.hiddenGemCount>=1,current:Math.min(s.hiddenGemCount,1),total:1})},
@@ -1681,7 +1681,46 @@ const ACHIEVEMENT_DEFS = [
   { key:'crossCountry', icon:'🧭', name:'Cross-Country', desc:'Rate two bathrooms 1,000+ miles apart',
     calc:s=>({done:s.maxMilesApart>=1000,current:Math.min(Math.round(s.maxMilesApart),1000),total:1000})},
   { key:'cityHopper', icon:'🌆', name:'City Hopper', desc:'Rate bathrooms in 15 different cities',
-    calc:s=>({done:s.cityCount>=15,current:Math.min(s.cityCount,15),total:15})}
+    calc:s=>({done:s.cityCount>=15,current:Math.min(s.cityCount,15),total:15})},
+  { key:'gettingStarted', icon:'🧻', name:'Getting Started', desc:'Rate 10 bathrooms',
+    calc:s=>({done:s.bathroomRatedCount>=10,current:Math.min(s.bathroomRatedCount,10),total:10})},
+  { key:'regular', icon:'🚻', name:'Regular', desc:'Rate 25 bathrooms',
+    calc:s=>({done:s.bathroomRatedCount>=25,current:Math.min(s.bathroomRatedCount,25),total:25})},
+  { key:'halfCentury', icon:'🎯', name:'Half Century', desc:'Rate 50 bathrooms',
+    calc:s=>({done:s.bathroomRatedCount>=50,current:Math.min(s.bathroomRatedCount,50),total:50})},
+  { key:'perfectionist', icon:'✨', name:'Perfectionist', desc:'Give ten 5-star ratings', hidden:true,
+    calc:s=>({done:s.fiveStarCount>=10,current:Math.min(s.fiveStarCount,10),total:10})},
+  { key:'gemCollector', icon:'💠', name:'Gem Collector', desc:'Rate 5 hidden gems',
+    calc:s=>({done:s.hiddenGemCount>=5,current:Math.min(s.hiddenGemCount,5),total:5})},
+  { key:'brandDevotee', icon:'🎖️', name:'Brand Devotee', desc:'Rate 25 locations of a single chain',
+    calc:s=>({done:s.maxOneChain>=25,current:Math.min(s.maxOneChain,25),total:25})},
+  { key:'nationwide', icon:'🗺️', name:'Nationwide', desc:'Rate bathrooms in 25 different states',
+    calc:s=>({done:s.stateCount>=25,current:Math.min(s.stateCount,25),total:25})},
+  { key:'transcontinental', icon:'🌎', name:'Transcontinental', desc:'Rate two bathrooms 2,500+ miles apart',
+    calc:s=>({done:s.maxMilesApart>=2500,current:Math.min(Math.round(s.maxMilesApart),2500),total:2500})},
+  { key:'onFire', icon:'⚡', name:'On Fire', desc:'Rate 7 days in a row',
+    calc:s=>({done:s.maxStreak>=7,current:Math.min(s.maxStreak,7),total:7})},
+  { key:'accessibilityScout', icon:'♿', name:'Accessibility Scout', desc:'Answer the accessibility question at 10 stops',
+    calc:s=>({done:s.accessibleAnsweredCount>=10,current:Math.min(s.accessibleAnsweredCount,10),total:10})},
+  { key:'cleanFreak', icon:'🧼', name:'Clean Freak', desc:'Give twenty-five 5-star ratings', hidden:true,
+    calc:s=>({done:s.fiveStarCount>=25,current:Math.min(s.fiveStarCount,25),total:25})},
+  { key:'truckStopHero', icon:'🚛', name:'Truck Stop Hero', desc:"Rate 25 travel-center stops (Pilot Flying J, Love's, Buc-ee's)",
+    calc:s=>({done:s.travelPlazaCount>=25,current:Math.min(s.travelPlazaCount,25),total:25})},
+  { key:'explorerElite', icon:'🎓', name:'Explorer Elite', desc:'Rate 250 bathrooms',
+    calc:s=>({done:s.bathroomRatedCount>=250,current:Math.min(s.bathroomRatedCount,250),total:250})},
+  { key:'bathroomLegend', icon:'👑', name:'Bathroom Legend', desc:'Rate 500 bathrooms',
+    calc:s=>({done:s.bathroomRatedCount>=500,current:Math.min(s.bathroomRatedCount,500),total:500})},
+  { key:'hallOfFame', icon:'🏆', name:'Hall of Fame', desc:'Rate 1,000 bathrooms',
+    calc:s=>({done:s.bathroomRatedCount>=1000,current:Math.min(s.bathroomRatedCount,1000),total:1000})},
+  // ---- Hidden trophies (masked until unlocked) ----
+  { key:'ironStomach', icon:'👃', name:'Iron Stomach', desc:'Give twenty-five 1-star ratings', hidden:true,
+    calc:s=>({done:s.oneStarCount>=25,current:Math.min(s.oneStarCount,25),total:25})},
+  { key:'winterWarrior', icon:'❄️', name:'Winter Warrior', desc:'Rate a bathroom in December–February', hidden:true,
+    calc:s=>({done:s.hasWinter,current:s.hasWinter?1:0,total:1})},
+  { key:'summerRoadTrip', icon:'🌞', name:'Summer Road Trip', desc:'Rate a bathroom in June–August', hidden:true,
+    calc:s=>({done:s.hasSummer,current:s.hasSummer?1:0,total:1})},
+  { key:'vacationMode', icon:'🧳', name:'Vacation Mode', desc:'Rate bathrooms in 5 states within one week', hidden:true,
+    calc:s=>({done:s.maxStatesIn7Days>=5,current:Math.min(s.maxStatesIn7Days,5),total:5})}
 ];
 
 // We don't have real county data in locations.js, only addresses — so "County Collector"
@@ -1739,13 +1778,15 @@ async function computeAchievementStats(){
   });
   const maxOneChain = Object.values(chainCounts).reduce((m,n)=>Math.max(m,n), 0);
 
-  let hasEarlyBird=false, hasNightOwl=false;
+  let hasEarlyBird=false, hasNightOwl=false, hasWinter=false, hasSummer=false;
   const weekendDays = new Set(), dayCounts = {}, dayKeys = new Set();
   rated.forEach(r => {
     if(!r.ratedAt) return;                       // time-based stats need a ratedAt timestamp
-    const d = new Date(r.ratedAt), h = d.getHours(), dow = d.getDay(), key = d.toDateString();
+    const d = new Date(r.ratedAt), h = d.getHours(), dow = d.getDay(), key = d.toDateString(), mo = d.getMonth();
     if(h < 5) hasEarlyBird = true;
     if(h >= 0 && h < 4) hasNightOwl = true;
+    if(mo === 11 || mo === 0 || mo === 1) hasWinter = true;   // Dec–Feb
+    if(mo >= 5 && mo <= 7) hasSummer = true;                   // Jun–Aug
     if(dow === 0 || dow === 6) weekendDays.add(key);
     dayCounts[key] = (dayCounts[key] || 0) + 1;
     dayKeys.add(key);
@@ -1759,12 +1800,36 @@ async function computeAchievementStats(){
       if(d > maxMilesApart) maxMilesApart = d;
     }
 
+  // How many of your ratings include a definitive accessibility answer (yes/no) — powers the
+  // Accessibility Scout badge, which nudges people at the app's biggest data gap.
+  const accessibleAnsweredCount = Object.values(myVoteCache).filter(v =>
+    v && v.amenities && (v.amenities.accessible === 'yes' || v.amenities.accessible === 'no')
+  ).length;
+
+  // Truck Stop Hero — ratings at the big interstate travel-center chains.
+  const TRAVEL_CENTER_CHAINS = new Set(['pilotFlyingJ','loves','bucees']);
+  const travelPlazaCount = rated.filter(r => TRAVEL_CENTER_CHAINS.has(r.loc.chain)).length;
+
+  // Vacation Mode — most distinct states rated within any single 7-day window.
+  const stateDated = rated
+    .filter(r => r.ratedAt && stateFromAddr(r.loc.addr))
+    .map(r => ({ t: r.ratedAt, st: stateFromAddr(r.loc.addr) }))
+    .sort((a, b) => a.t - b.t);
+  let maxStatesIn7Days = 0;
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  for(let i = 0; i < stateDated.length; i++){
+    const w = new Set();
+    for(let j = i; j < stateDated.length && stateDated[j].t - stateDated[i].t <= WEEK_MS; j++) w.add(stateDated[j].st);
+    if(w.size > maxStatesIn7Days) maxStatesIn7Days = w.size;
+  }
+
   return {
-    bathroomRatedCount, fiveStarCount, oneStarCount, hiddenGemCount,
+    bathroomRatedCount, fiveStarCount, oneStarCount, hiddenGemCount, accessibleAnsweredCount,
     stateCount: states.size, cityCount: cities.size,
     chainCount: Object.keys(chainCounts).length, maxOneChain,
     totalChains: Object.keys(CHAIN_REGISTRY).length,
-    hasEarlyBird, hasNightOwl, weekendCount: weekendDays.size,
+    hasEarlyBird, hasNightOwl, hasWinter, hasSummer, weekendCount: weekendDays.size,
+    travelPlazaCount, maxStatesIn7Days,
     maxInOneDay, maxStreak: longestConsecutiveDayStreak(dayKeys), maxMilesApart,
     visitedCount: bathroomRatedCount, totalLocations: seedLocations.length
   };
@@ -1899,13 +1964,17 @@ function renderBathroomPassport(stats, results){
   if(listEl){
     listEl.innerHTML = ACHIEVEMENT_DEFS.map(def => {
       const r = results[def.key];
+      const secret = def.hidden && !r.unlocked;   // hidden trophy, not yet earned → mask its details
+      const icon = secret ? '❓' : def.icon;
+      const name = secret ? 'Hidden Trophy' : def.name;
+      const desc = secret ? 'Keep exploring to reveal this one.' : def.desc;
       const dateStr = r.unlockedAt ? new Date(r.unlockedAt).toLocaleDateString() : null;
-      const progressStr = (!r.unlocked && r.total > 1) ? `${r.current} / ${r.total}` : '';
-      return `<div class="achievement-card ${r.unlocked ? 'unlocked' : 'locked'}">
-        <div class="achievement-icon">${def.icon}</div>
+      const progressStr = (!secret && !r.unlocked && r.total > 1) ? `${r.current} / ${r.total}` : '';
+      return `<div class="achievement-card ${r.unlocked ? 'unlocked' : 'locked'}${secret ? ' hidden-trophy' : ''}">
+        <div class="achievement-icon">${icon}</div>
         <div class="achievement-info">
-          <div class="achievement-name">${def.name}</div>
-          <div class="achievement-desc">${def.desc}</div>
+          <div class="achievement-name">${name}</div>
+          <div class="achievement-desc">${desc}</div>
           ${r.unlocked
             ? `<div class="achievement-date">Unlocked ${dateStr}</div>`
             : (progressStr ? `<div class="achievement-progress">${progressStr}</div>` : '')}
