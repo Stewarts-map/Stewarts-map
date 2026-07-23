@@ -33,7 +33,11 @@ const CHAIN_REGISTRY = {
   nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
   nycGregorys: { name: 'Gregorys Coffee', color: '#1a1a1a', textColor: '#ffffff', dataVar: 'nycGregorysLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
-  nycPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' }
+  nycPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' },
+  bosTatte: { name: 'Tatte Bakery', color: '#b5651d', textColor: '#ffffff', dataVar: 'bosTatteLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
+  bosDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'bosDunkinLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
+  bosStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'bosStarbucksLocations', group: 'metro', metro: 'Boston', layer: 'customer' },
+  bosPavement: { name: 'Pavement Coffeehouse', color: '#00695c', textColor: '#ffffff', dataVar: 'bosPavementLocations', group: 'metro', metro: 'Boston', layer: 'customer' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
@@ -98,8 +102,16 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   const arrow = document.getElementById('legendArrow');
 
   // Pins are colored by store brand (not community rating), so the key lists chains.
+  // Dedupe by name+color: the same brand registered in multiple metros (e.g. Dunkin' in NYC
+  // and Boston) is one legend entry, not one per city.
   if(body){
-    body.innerHTML = Object.keys(CHAIN_REGISTRY).map(k => {
+    const seen = new Set();
+    body.innerHTML = Object.keys(CHAIN_REGISTRY).filter(k => {
+      const c = CHAIN_REGISTRY[k];
+      const sig = c.name + '|' + c.color;
+      if(seen.has(sig)) return false;
+      seen.add(sig); return true;
+    }).map(k => {
       const c = CHAIN_REGISTRY[k];
       return `<div><span class="dot" style="background:${c.color}"></span>${c.name}</div>`;
     }).join('');
@@ -2777,6 +2789,7 @@ function setSelectedMetro(city, manual){
 // needed.
 const METRO_BOUNDS = {
   NYC: { minLat: 40.49, maxLat: 40.92, minLng: -74.27, maxLng: -73.68 },
+  Boston: { minLat: 42.22, maxLat: 42.45, minLng: -71.21, maxLng: -70.92 },
 };
 function insideAnyMetro(lat, lng){
   return metroAt(lat, lng) !== null;
