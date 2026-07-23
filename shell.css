@@ -502,3 +502,6 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
   font-size:20px; border-radius:12px; display:grid; place-items:center; cursor:pointer;
 }
 #onboardingInfoBtn:active{ background:var(--shell-chrome2); }
+
+/* Coverage note under the Getting around selector */
+#appDrawer .d-coverage-note{ font-size:.78rem; opacity:.7; margin-top:6px; line-height:1.4; }

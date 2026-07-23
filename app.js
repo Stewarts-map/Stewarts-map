@@ -30,9 +30,9 @@ const CHAIN_REGISTRY = {
   kwiktrip: { name: "Kwik Trip", color: '#3f51b5', textColor: '#ffffff', dataVar: 'kwiktripLocations' },
   royalFarms: { name: "Royal Farms", color: '#33691e', textColor: '#ffffff', dataVar: 'royalFarmsLocations' },
   rutters: { name: "Rutter's", color: '#4e342e', textColor: '#ffffff', dataVar: 'ruttersLocations' },
-  nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer', shape: 'square' },
-  nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer', shape: 'square' },
-  nycPublic: { name: 'Public restroom', color: '#0e7c5a', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' }
+  nycDunkin: { name: "Dunkin'", color: '#ff6e0c', textColor: '#ffffff', dataVar: 'nycDunkinLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
+  nycStarbucks: { name: 'Starbucks', color: '#00704a', textColor: '#ffffff', dataVar: 'nycStarbucksLocations', group: 'metro', metro: 'NYC', layer: 'customer' },
+  nycPublic: { name: 'Public restroom', color: '#0057b8', textColor: '#ffffff', dataVar: 'nycPublicLocations', group: 'metro', metro: 'NYC', layer: 'public', shape: 'diamond' }
 };
 const DEFAULT_CHAIN_KEY = 'stewarts';
 
@@ -2699,11 +2699,13 @@ function applyFilters(){
     const openOk = showAllLocations || isLocationOpenNow(loc) !== false; // hide only confirmed-closed; unknown stays visible
     const accessOk = !hideInaccessible || !isConfirmedNotAccessible(loc); // hide only confirmed-inaccessible; unknown stays visible
     const chainOk = activeChains.has(m.chainKey || DEFAULT_CHAIN_KEY);
-    // Metro (city) pins require BOTH foot mode AND city-level zoom (>= METRO_MIN_ZOOM), so the
-    // highway view stays pit-stops-only even on foot. Pit stops always show. Bathroom Now still
-    // finds metro spots regardless (it filters seedLocations, not markers).
+    // Modes: "On the road" shows EVERYTHING; "On foot" shows ONLY metro/city locations.
+    // Metro pins are additionally zoom-gated (>= METRO_MIN_ZOOM) in any mode so a zoomed-out
+    // map never floods with dense city pins.
     const isMetroLoc = groupOf(m.chainKey || DEFAULT_CHAIN_KEY) === 'metro';
-    const layerOk = !isMetroLoc || (travelMode === 'foot' && map.getZoom() >= METRO_MIN_ZOOM);
+    const zoomOk = !isMetroLoc || map.getZoom() >= METRO_MIN_ZOOM;
+    const modeOk = travelMode === 'foot' ? isMetroLoc : true;
+    const layerOk = zoomOk && modeOk;
     const popupOpen = m.isPopupOpen && m.isPopupOpen();
     if((openOk && accessOk && chainOk && layerOk) || popupOpen){
       if(!markerCluster.hasLayer(m)) markerCluster.addLayer(m);
@@ -2809,10 +2811,10 @@ async function saveTravelModeToAccount(){
 // dumping ~1,400 dense city pins into a zoomed-out map.
 const METRO_MIN_ZOOM = 12;
 
-// Shared with List and Bathroom Now: does the travel mode allow this location right now?
-// (Metro/city locations only count "on foot" — matches the map's applyFilters gate.)
+// Shared with List: does the travel mode allow this location right now?
+// "On the road" allows everything; "On foot" allows only metro/city locations.
 function modeAllows(loc){
-  return groupOf(loc.chain || DEFAULT_CHAIN_KEY) !== 'metro' || travelMode === 'foot';
+  return travelMode === 'foot' ? groupOf(loc.chain || DEFAULT_CHAIN_KEY) === 'metro' : true;
 }
 
 function getActiveChains(){
@@ -2905,18 +2907,25 @@ document.getElementById('metroFilterBody')?.addEventListener('change', onSubLaye
 function renderLayers(){
   const metros = metroKeys();
   const hasMetros = metros.length > 0;
-  const modeBtn = document.getElementById('travelModeToggle');
+  const modePref = document.getElementById('travelModePref');
   const mFilter = document.getElementById('metroFilter');
-  if(modeBtn) modeBtn.style.display = hasMetros ? '' : 'none';
+  if(modePref) modePref.style.display = hasMetros ? '' : 'none';
   if(mFilter) mFilter.style.display = (hasMetros && isLoggedIn()) ? '' : 'none';
   if(!hasMetros) return;
 
-  if(modeBtn){
-    const foot = travelMode === 'foot';
-    modeBtn.classList.toggle('on', foot);
-    modeBtn.setAttribute('aria-pressed', String(foot));
-    const label = modeBtn.querySelector('.travel-mode-label');
-    if(label) label.textContent = foot ? '🚶 On foot' : '🛣️ On the road';
+  const sel = document.getElementById('travelModeSelect');
+  if(sel && sel.value !== travelMode) sel.value = travelMode;
+
+  // "On foot" shows city locations only, so say which cities are actually covered.
+  const cov = document.getElementById('travelModeCoverage');
+  if(cov){
+    if(travelMode === 'foot'){
+      const cities = [...new Set(metros.map(k => CHAIN_REGISTRY[k].metro || 'Other'))];
+      cov.textContent = `🏙️ City coverage: ${cities.join(', ')} — more cities coming`;
+      cov.style.display = '';
+    } else {
+      cov.style.display = 'none';
+    }
   }
 
   // City detail (per-metro public/customer checkboxes) — a signed-in refinement, gated like chains.
@@ -2943,10 +2952,10 @@ function renderLayers(){
   }).join('');
 }
 
-// Mode toggle — everyone. Flips road ⟷ foot, which shows/hides the whole city layer. A manual
-// flip counts as an explicit choice (auto-detect defers to it) and syncs to the account if signed in.
-document.getElementById('travelModeToggle')?.addEventListener('click', () => {
-  travelMode = (travelMode === 'foot') ? 'road' : 'foot';
+// "Getting around" dropdown — everyone. Picks road ⟷ foot, which shows/hides the city layer.
+// A manual pick counts as an explicit choice (auto-detect defers) and syncs to the account.
+document.getElementById('travelModeSelect')?.addEventListener('change', (e) => {
+  travelMode = (e.target.value === 'foot') ? 'foot' : 'road';
   localStorage.setItem('travelModeChosen', '1');
   saveTravelMode(); saveTravelModeToAccount(); renderLayers(); applyFilters();
 });
