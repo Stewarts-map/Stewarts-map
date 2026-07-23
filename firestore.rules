@@ -191,6 +191,32 @@ service cloud.firestore {
 
 
     // ============================================================
+    //  Leaderboard + user stats (server-derived, read-only to clients)
+    // ============================================================
+    // Both are written ONLY by the leaderboard Cloud Function (admin privileges bypass rules),
+    // derived from vote docs. Anyone may read them; no client may write them.
+    match /leaderboard/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /userStats/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+
+    // ============================================================
+    //  Public user profiles (display name + own ratings snapshot)
+    // ============================================================
+    // Keyed by the owner's uid. Readable by anyone (the leaderboard/credits show display names),
+    // but only the owner may write their own doc.
+    match /users/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && uid == request.auth.uid;
+    }
+
+
+    // ============================================================
     //  Default deny — anything not listed above is inaccessible
     // ============================================================
     match /{document=**} {

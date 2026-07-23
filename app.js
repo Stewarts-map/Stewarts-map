@@ -1113,6 +1113,8 @@ function metroPopupHtml(loc, agg, myVote){
   const hoursLine = raw
     ? `<div class="hours-line">🕐 ${escapeHtml(raw)}</div>`
     : `<div class="hours-line">🕐 Hours not listed yet — know them? Tap 🚩 below to send them in.</div>`;
+  const recency = agg ? relativeTimeFromNow(agg.lastRatedAt || agg.lastUpdated) : '';
+  const recencyLine = recency ? `<div class="hours-line">📝 Last rated ${recency}</div>` : '';
   return `<div class="popup-inner" data-locid="${loc.id}">
     <div class="popup-head-row">
       <div class="chain-badge" style="background:${chain.color};color:${chain.textColor};">${escapeHtml(chain.name)}</div>
@@ -1122,6 +1124,7 @@ function metroPopupHtml(loc, agg, myVote){
     ${(loc.metroInfo && loc.metroInfo.fee) ? `<div class="hours-line">${loc.metroInfo.fee === 'free' ? '✅ Free to use' : '💰 Paid / fee'}</div>` : ''}
     ${(loc.metroInfo && loc.metroInfo.disposal) ? `<div class="hours-line">🚻 Basic facilities (portable / chemical unit)</div>` : ''}
     ${hoursLine}
+    ${recencyLine}
     <div id="accessible-badge-${loc.id}">${accessibleBadgeHtml(loc.id)}</div>
     <div class="popup-actions">
       <button class="btn btn-primary directions-btn" id="directions-btn-${loc.id}" data-lat="${loc.lat}" data-lng="${loc.lng}">🧭 Directions</button>
@@ -3195,7 +3198,7 @@ function updateAccountUI(passportMode){
   const accountBtn = document.getElementById('accountToggle');
   if(loggedIn){
     const email = window.__currentUser.email || '';
-    const username = email.split('@')[0]; // never show the raw email/UID anywhere in the UI
+    const username = (email.split('@')[0] || '').toUpperCase(); // ALL CAPS display; never show raw email/UID
     document.getElementById('loggedInUsername').textContent = username;
     if(accountBtn) accountBtn.textContent = '👤 ' + username;
   } else if(accountBtn){
@@ -3226,7 +3229,6 @@ function openAccountPanel(mode){
   updateAccountUI(isPassport);
   checkAndUnlockAchievements();
   if(isPassport){
-    loadLeaderboard();
     requestAnimationFrame(() => {
       const p = document.getElementById('passportSection');
       if(p) p.scrollIntoView({ block: 'start' });
