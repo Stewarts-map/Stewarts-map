@@ -53,11 +53,21 @@ Object.keys(CHAIN_REGISTRY).forEach(chainKey => {
 const locationsById = {};
 seedLocations.forEach(loc => { locationsById[loc.id] = loc; });
 
-// Total location count shown in the menu (hamburger) drawer footer, above the version.
-// Derived from the merged list so it stays correct automatically when chains are added.
+// Total location count shown in the menu (hamburger) drawer footer, above the version —
+// total first, then a breakdown: pit stops and each covered metro separately.
 (function(){
   const el = document.getElementById('drawerLocCount');
-  if(el) el.textContent = `${seedLocations.length.toLocaleString()} locations mapped`;
+  if(!el) return;
+  const pit = seedLocations.filter(l => groupOf(l.chain || DEFAULT_CHAIN_KEY) !== 'metro').length;
+  const byCity = {};
+  seedLocations.forEach(l => {
+    const c = CHAIN_REGISTRY[l.chain || DEFAULT_CHAIN_KEY];
+    if(c && c.group === 'metro'){ const m = c.metro || 'Other'; byCity[m] = (byCity[m] || 0) + 1; }
+  });
+  const lines = [`🛣️ Pit stops: ${pit.toLocaleString()}`,
+    ...Object.keys(byCity).map(m => `🏙️ ${escapeHtml(m)}: ${byCity[m].toLocaleString()}`)];
+  el.innerHTML = `${seedLocations.length.toLocaleString()} locations mapped` +
+    `<span class="d-count-breakdown">${lines.join('<br>')}</span>`;
 })();
 
 // Theme: defaults to the phone's system light/dark setting, but a manual toggle overrides it
@@ -2835,7 +2845,7 @@ function syncChainFilterToAuth(){
   const cf = document.getElementById('chainFilter');
   if(cf){
     const multiChain = Object.keys(CHAIN_REGISTRY).length >= 2;
-    cf.style.display = (isLoggedIn() && multiChain) ? '' : 'none';
+    cf.style.display = (isLoggedIn() && multiChain && travelMode !== 'foot') ? '' : 'none';
   }
   if(typeof renderNavPref === 'function') renderNavPref();
   applyFilters();
@@ -2910,7 +2920,11 @@ function renderLayers(){
   const modePref = document.getElementById('travelModePref');
   const mFilter = document.getElementById('metroFilter');
   if(modePref) modePref.style.display = hasMetros ? '' : 'none';
-  if(mFilter) mFilter.style.display = (hasMetros && isLoggedIn()) ? '' : 'none';
+  // Drawer sections follow the mode: "On the road" shows the pit-stop Chains list; "On foot"
+  // shows the city tree instead (pit stops are hidden on foot, so their filter would be noise).
+  const cf = document.getElementById('chainFilter');
+  if(cf) cf.style.display = (isLoggedIn() && Object.keys(CHAIN_REGISTRY).some(k => groupOf(k) !== 'metro') && travelMode !== 'foot') ? '' : 'none';
+  if(mFilter) mFilter.style.display = (hasMetros && isLoggedIn() && travelMode === 'foot') ? '' : 'none';
   if(!hasMetros) return;
 
   const sel = document.getElementById('travelModeSelect');

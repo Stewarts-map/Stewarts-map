@@ -505,3 +505,6 @@ body:not(.logged-in) #appDrawer #navAppPref{ display:none !important; }
 
 /* Coverage note under the Getting around selector */
 #appDrawer .d-coverage-note{ font-size:.78rem; opacity:.7; margin-top:6px; line-height:1.4; }
+
+/* Location-count breakdown under the drawer footer total */
+#appDrawer .d-count-breakdown{ display:block; font-weight:400; font-size:.78rem; opacity:.75; margin-top:3px; line-height:1.5; }
