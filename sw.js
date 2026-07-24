@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bathroomreport-v90';
+const CACHE_NAME = 'bathroomreport-v95';
 const APP_SHELL = [
   './',
   './index.html',
@@ -26,6 +26,7 @@ const APP_SHELL = [
   './kwiktrip-locations.js',
   './royalfarms-locations.js',
   './rutters-locations.js',
+  './speedway-locations.js',
   './nyc-dunkin-locations.js',
   './nyc-starbucks-locations.js',
   './nyc-gregorys-locations.js',
@@ -33,6 +34,8 @@ const APP_SHELL = [
   './bos-dunkin-locations.js',
   './bos-starbucks-locations.js',
   './bos-pavement-locations.js',
+  './bos-flour-locations.js',
+  './bos-nero-locations.js',
   './bos-public-locations.js',
   './nyc-public-locations.js',
   './app.js',
