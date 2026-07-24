@@ -2166,7 +2166,6 @@ let _mostRecentLoaded = false;
 async function updateMostRecentBadge(){
   const el = document.getElementById('mostRecentBadge');
   if(!el || _mostRecentLoaded) return;
-  _mostRecentLoaded = true;
   try{
     const {db, collection, query, where, orderBy, limit, getDocs} = await fb();
     let rec = null;
@@ -2194,6 +2193,7 @@ async function updateMostRecentBadge(){
     const loc = locationsById[rec.locId];
     const name = (loc && loc.n) || 'a bathroom';
     el.textContent = `🕐 Most recently rated: ${name} — ${relativeTimeFromNow(rec.ts)}`;
+    _mostRecentLoaded = true;   // lock only after a real, successful write
     if(loc && markers[loc.id]) el.onclick = () => zoomToMarker(markers[loc.id]);
     refreshStatTicker();
   }catch(e){
